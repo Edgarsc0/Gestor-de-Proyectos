@@ -4,8 +4,8 @@ import Providers from "@/components/Providers";
 import "./globals.css";
 
 export const metadata: Metadata = {
-  title: "Gestión de Equipo — Servicio Social",
-  description: "Sistema de gestión de proyectos y tareas para equipos de servicio social",
+  title: "ANAM Team — Gestión de Proyectos y Equipo",
+  description: "Sistema de gestión de proyectos, tareas y equipo para ANAM",
 };
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {

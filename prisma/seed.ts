@@ -1,5 +1,5 @@
 // prisma/seed.ts
-// Datos de ejemplo para probar el sistema
+// Datos de ejemplo para ANAM Team
 
 import { PrismaClient } from "@prisma/client";
 

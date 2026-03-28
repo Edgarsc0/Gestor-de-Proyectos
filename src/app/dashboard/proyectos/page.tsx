@@ -212,8 +212,8 @@ export default function ProyectosPage() {
                 <button
                   key={c}
                   onClick={() => setFormData({ ...formData, color: c })}
-                  className={`w-8 h-8 rounded-lg transition-all ${formData.color === c ? "ring-2 ring-offset-2 scale-110" : "hover:scale-105"}`}
-                  style={{ backgroundColor: c, ringColor: c }}
+                  className={`w-8 h-8 rounded-lg transition-all ${formData.color === c ? "scale-110" : "hover:scale-105"}`}
+                  style={{ backgroundColor: c, outline: formData.color === c ? `2px solid ${c}` : "none", outlineOffset: "3px" }}
                 />
               ))}
             </div>

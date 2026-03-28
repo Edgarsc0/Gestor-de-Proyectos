@@ -34,12 +34,12 @@ export default function LoginPage() {
           </div>
 
           <h1 className="font-display text-2xl font-bold text-slate-900 mb-2">
-            Gestión de Equipo
+            ANAM Team
           </h1>
           <p className="text-slate-500 text-sm mb-8 leading-relaxed">
-            Controla proyectos, tareas y el avance de cada
+            Gestiona proyectos, tareas y el avance de cada
             <br />
-            miembro de tu equipo de servicio social.
+            miembro de tu equipo en ANAM.
           </p>
 
           <button
@@ -64,12 +64,12 @@ export default function LoginPage() {
           </button>
 
           <p className="mt-6 text-xs text-slate-400">
-            Solo miembros autorizados del equipo pueden acceder.
+            Solo miembros autorizados de ANAM pueden acceder.
           </p>
         </div>
 
         <p className="text-center text-xs text-slate-400 mt-6">
-          Servicio Social — Sistema de Gestión de Proyectos
+          ANAM Team — anam-team.com
         </p>
       </div>
     </div>

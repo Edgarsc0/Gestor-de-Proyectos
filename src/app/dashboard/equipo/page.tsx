@@ -148,7 +148,7 @@ export default function EquipoPage() {
               </svg>
             </div>
             <p className="text-slate-500 text-sm">
-              {filter === "all" ? "Los miembros aparecerán aquí cuando inicien sesión con Google." : "No hay miembros con este filtro."}
+              {filter === "all" ? "Los miembros aparecerán aquí cuando inicien sesión con Google en ANAM Team." : "No hay miembros con este filtro."}
             </p>
           </div>
         )}

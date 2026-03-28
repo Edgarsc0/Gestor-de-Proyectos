@@ -253,7 +253,7 @@ export default function DashboardPage() {
           ))}
           {members.length === 0 && (
             <div className="col-span-full card p-8 text-center text-slate-400 text-sm">
-              Aún no hay miembros. Los usuarios aparecerán aquí al iniciar sesión con Google.
+              Aún no hay miembros. Los usuarios de ANAM aparecerán aquí al iniciar sesión con Google.
             </div>
           )}
         </div>

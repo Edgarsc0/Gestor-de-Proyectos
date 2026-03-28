@@ -1,5 +1,5 @@
 // prisma/schema.prisma
-// Sistema de Gestión de Equipos - Servicio Social
+// ANAM Team — Sistema de Gestión de Proyectos y Equipo
 
 generator client {
   provider = "prisma-client-js"

@@ -103,8 +103,8 @@ export default function Sidebar() {
           </div>
           {!collapsed && (
             <div className="min-w-0">
-              <h2 className="font-display font-bold text-sm text-slate-900 truncate">Gestión de Equipo</h2>
-              <p className="text-[11px] text-slate-400 truncate">Servicio Social</p>
+              <h2 className="font-display font-bold text-sm text-slate-900 truncate">ANAM Team</h2>
+              <p className="text-[11px] text-slate-400 truncate">anam-team.com</p>
             </div>
           )}
         </div>
