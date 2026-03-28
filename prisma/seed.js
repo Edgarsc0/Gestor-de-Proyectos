@@ -1,4 +1,4 @@
-// prisma/seed.ts
+// prisma/seed.js
 // Datos de ejemplo para ANAM Team
 
 import { PrismaClient } from "@prisma/client";

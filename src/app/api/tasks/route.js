@@ -1,10 +1,10 @@
-// src/app/api/tasks/route.ts
-import { NextRequest, NextResponse } from "next/server";
+// src/app/api/tasks/route.js
+import { NextResponse } from "next/server";
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 
-export async function GET(req: NextRequest) {
+export async function GET(req) {
   const session = await getServerSession(authOptions);
   if (!session) return NextResponse.json({ error: "No autorizado" }, { status: 401 });
 
@@ -13,7 +13,7 @@ export async function GET(req: NextRequest) {
   const assigneeId = searchParams.get("assigneeId");
   const status = searchParams.get("status");
 
-  const where: any = {};
+  const where = {};
   if (projectId) where.projectId = projectId;
   if (assigneeId) where.assigneeId = assigneeId;
   if (status) where.status = status;
@@ -30,7 +30,7 @@ export async function GET(req: NextRequest) {
   return NextResponse.json(tasks);
 }
 
-export async function POST(req: NextRequest) {
+export async function POST(req) {
   const session = await getServerSession(authOptions);
   if (!session) return NextResponse.json({ error: "No autorizado" }, { status: 401 });
 
@@ -59,7 +59,7 @@ export async function POST(req: NextRequest) {
   return NextResponse.json(task, { status: 201 });
 }
 
-export async function PUT(req: NextRequest) {
+export async function PUT(req) {
   const session = await getServerSession(authOptions);
   if (!session) return NextResponse.json({ error: "No autorizado" }, { status: 401 });
 
@@ -80,7 +80,7 @@ export async function PUT(req: NextRequest) {
   return NextResponse.json(task);
 }
 
-export async function DELETE(req: NextRequest) {
+export async function DELETE(req) {
   const session = await getServerSession(authOptions);
   if (!session) return NextResponse.json({ error: "No autorizado" }, { status: 401 });
 

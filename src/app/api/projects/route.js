@@ -1,5 +1,5 @@
-// src/app/api/projects/route.ts
-import { NextRequest, NextResponse } from "next/server";
+// src/app/api/projects/route.js
+import { NextResponse } from "next/server";
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
@@ -21,7 +21,7 @@ export async function GET() {
   return NextResponse.json(projects);
 }
 
-export async function POST(req: NextRequest) {
+export async function POST(req) {
   const session = await getServerSession(authOptions);
   if (!session) return NextResponse.json({ error: "No autorizado" }, { status: 401 });
 
@@ -37,7 +37,7 @@ export async function POST(req: NextRequest) {
   return NextResponse.json(project, { status: 201 });
 }
 
-export async function PUT(req: NextRequest) {
+export async function PUT(req) {
   const session = await getServerSession(authOptions);
   if (!session) return NextResponse.json({ error: "No autorizado" }, { status: 401 });
 
@@ -52,7 +52,7 @@ export async function PUT(req: NextRequest) {
   return NextResponse.json(project);
 }
 
-export async function DELETE(req: NextRequest) {
+export async function DELETE(req) {
   const session = await getServerSession(authOptions);
   if (!session) return NextResponse.json({ error: "No autorizado" }, { status: 401 });
 
