@@ -34,11 +34,11 @@
   /* ─── Buttons ─── */
   .btn-primary {
     @apply inline-flex items-center justify-center gap-2 px-5 py-2.5
-           bg-brand-600 text-white font-medium rounded-xl text-sm
-           hover:bg-brand-500 active:scale-[0.97]
+           bg-brand-700 text-white font-medium rounded-xl text-sm
+           hover:bg-brand-600 active:scale-[0.97]
            transition-all duration-150
-           shadow-lg shadow-brand-500/30
-           dark:shadow-brand-600/20;
+           shadow-lg shadow-brand-700/30
+           dark:shadow-brand-900/40;
   }
   .btn-secondary {
     @apply inline-flex items-center justify-center gap-2 px-5 py-2.5
@@ -111,7 +111,7 @@
 
 /* ─── Gradient text utility ─── */
 .gradient-text {
-  @apply bg-gradient-to-r from-brand-600 to-violet-600 bg-clip-text text-transparent;
+  @apply bg-gradient-to-r from-brand-600 to-gold-500 bg-clip-text text-transparent;
 }
 
 /* ─── Shimmer loading ─── */

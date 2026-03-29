@@ -61,20 +61,67 @@ model User {
 
   // Relaciones de la app
   assignments   Assignment[]
-  createdTasks  Task[]       @relation("TaskCreator")
+  createdTasks  Task[]        @relation("TaskCreator")
+  uploadedFiles ProjectFile[] @relation("FileUploader")
+  areas         UserArea[]
+  titularOf     Area[]        @relation("AreaTitular")
+  posts         Post[]
+  sentMessages     Message[] @relation("SentMessages")
+  receivedMessages Message[] @relation("ReceivedMessages")
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 }
 
-model Project {
-  id          String        @id @default(cuid())
+model Area {
+  id          String  @id @default(cuid())
   name        String
   description String?
-  color       String        @default("#6366f1") // Color para identificar visualmente
-  status      ProjectStatus @default(ACTIVE)
+  color       String  @default("#8B1515")
+
+  titular   User?   @relation("AreaTitular", fields: [titularId], references: [id])
+  titularId String?
+
+  users    UserArea[]
+  projects Project[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+model UserArea {
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+  userId String
+  area   Area   @relation(fields: [areaId], references: [id], onDelete: Cascade)
+  areaId String
+
+  @@id([userId, areaId])
+}
+
+model Whitelist {
+  id             String   @id @default(cuid())
+  email          String   @unique
+  note           String?
+  assignedRole   Role?
+  assignedAreaId String?
+  createdAt      DateTime @default(now())
+}
+
+model Project {
+  id          String          @id @default(cuid())
+  name        String
+  description String?
+  color       String          @default("#8B1515")
+  status      ProjectStatus   @default(ACTIVE)
   tasks       Task[]
   assignments Assignment[]
+  files       ProjectFile[]
+  columns     ProjectColumn[]
+  posts       Post[]
+  messages    Message[]
+
+  area   Area?   @relation(fields: [areaId], references: [id])
+  areaId String?
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -87,6 +134,8 @@ model Task {
   status      TaskStatus @default(PENDING)
   priority    Priority   @default(MEDIUM)
   dueDate     DateTime?
+  fileUrl     String?    @db.Text
+  fileName    String?
 
   project   Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
   projectId String
@@ -96,11 +145,14 @@ model Task {
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
+
+  columnId String?
+  column   ProjectColumn? @relation(fields: [columnId], references: [id])
 }
 
 model Assignment {
-  id     String @id @default(cuid())
-  role   String @default("Colaborador") // Rol dentro del proyecto
+  id   String @id @default(cuid())
+  role String @default("Colaborador") // Rol dentro del proyecto
 
   user      User    @relation(fields: [userId], references: [id], onDelete: Cascade)
   userId    String
@@ -112,10 +164,67 @@ model Assignment {
   @@unique([userId, projectId])
 }
 
+model ProjectFile {
+  id           String   @id @default(cuid())
+  name         String
+  url          String
+  size         Int
+  type         String
+  project      Project  @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  projectId    String
+  uploadedBy   User     @relation("FileUploader", fields: [uploadedById], references: [id])
+  uploadedById String
+  createdAt    DateTime @default(now())
+}
+
+model ProjectColumn {
+  id        String  @id @default(cuid())
+  name      String // Ej. "En progreso"
+  color     String // Ej. "#3b82f6"
+  order     Int // Para saber qué columna va primero
+  projectId String
+  project   Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  tasks     Task[]
+}
+
+model Post {
+  id        String   @id @default(cuid())
+  title     String?
+  content   String
+  fileUrl   String?  @db.Text
+  fileName  String?
+  createdAt DateTime @default(now())
+
+  projectId String
+  project   Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
+
+  authorId String
+  author   User   @relation(fields: [authorId], references: [id], onDelete: Cascade)
+}
+
+model Message {
+  id         String   @id @default(cuid())
+  text       String?
+  fileUrl    String?  @db.Text
+  fileName   String?
+  createdAt  DateTime @default(now())
+
+  senderId   String
+  sender     User     @relation("SentMessages", fields: [senderId], references: [id], onDelete: Cascade)
+
+  receiverId String
+  receiver   User     @relation("ReceivedMessages", fields: [receiverId], references: [id], onDelete: Cascade)
+
+  projectId  String
+  project    Project  @relation(fields: [projectId], references: [id], onDelete: Cascade)
+}
+
 // ─── Enums ─────────────────────────────────────────────────────
 
 enum Role {
+  SUPERADMIN
   ADMIN
+  TITULAR
   MEMBER
 }
 

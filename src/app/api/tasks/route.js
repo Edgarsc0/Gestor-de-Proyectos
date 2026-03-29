@@ -35,7 +35,7 @@ export async function POST(req) {
   if (!session) return NextResponse.json({ error: "No autorizado" }, { status: 401 });
 
   const body = await req.json();
-  const { title, description, projectId, assigneeId, priority, dueDate } = body;
+  const { title, description, projectId, assigneeId, priority, dueDate, columnId, fileUrl, fileName } = body;
 
   if (!title || !projectId) {
     return NextResponse.json({ error: "Título y proyecto son requeridos" }, { status: 400 });
@@ -49,6 +49,9 @@ export async function POST(req) {
       assigneeId: assigneeId || null,
       priority: priority || "MEDIUM",
       dueDate: dueDate ? new Date(dueDate) : null,
+      columnId: columnId || null,
+      fileUrl: fileUrl || null,
+      fileName: fileName || null,
     },
     include: {
       project: { select: { name: true, color: true } },
