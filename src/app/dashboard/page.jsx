@@ -141,6 +141,49 @@ export default function DashboardPage() {
     });
   }
 
+  // Cross-populate para asegurar que todos los miembros y proyectos tengan sus referencias cruzadas
+  if (projects && members) {
+    projects.forEach((p) => {
+      if (p.assignments) {
+        p.assignments.forEach((a) => {
+          const uid = a.userId || a.user?.id;
+          const member = members.find((m) => m.id === uid);
+
+          if (member) {
+            // Aseguramos que la asignación del proyecto tenga el objeto user
+            if (!a.user) a.user = member;
+
+            // Aseguramos que el miembro tenga la asignación del proyecto
+            if (!member.assignments) member.assignments = [];
+            if (
+              !member.assignments.some(
+                (ma) => ma.projectId === p.id || ma.project?.id === p.id,
+              )
+            ) {
+              member.assignments.push({
+                id: a.id || `assign-${uid}-${p.id}`,
+                role: a.role || "Colaborador",
+                project: p,
+                projectId: p.id,
+                userId: uid,
+              });
+            }
+          }
+        });
+      }
+    });
+  }
+
+  // Filtramos los proyectos del miembro actual para su vista personal
+  const myProjects = isMember
+    ? projects?.filter((p) =>
+        p.assignments?.some(
+          (a) =>
+            a.userId === session?.user?.id || a.user?.id === session?.user?.id,
+        ),
+      ) || []
+    : projects || [];
+
   // Filtramos a los administradores para que no salgan en las listas operativas del equipo
   const teamMembers =
     members?.filter((m) => m.role !== "ADMIN" && m.role !== "SUPERADMIN") || [];
@@ -157,9 +200,10 @@ export default function DashboardPage() {
 
     // Modal: Proyectos Activos
     if (kpiModal.type === "PROJECTS") {
+      const displayProjects = isMember ? myProjects : projects;
       return (
         <div className="space-y-3">
-          {projects.map((p) => (
+          {displayProjects.map((p) => (
             <Link
               href={`/dashboard/proyectos/${p.id}`}
               key={p.id}
@@ -367,9 +411,17 @@ export default function DashboardPage() {
       {!isAdmin && (
         <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
           <StatCard
-            label={isTitular ? "Proyectos del área" : "Proyectos activos"}
-            value={stats.activeProjects}
-            sub={`de ${stats.totalProjects} totales`}
+            label={
+              isTitular
+                ? "Proyectos del área"
+                : isMember
+                  ? "Mis proyectos"
+                  : "Proyectos activos"
+            }
+            value={isMember ? myProjects.length : stats.activeProjects}
+            sub={
+              isMember ? "asignados a mí" : `de ${stats.totalProjects} totales`
+            }
             icon={
               <svg
                 width="20"
@@ -388,7 +440,11 @@ export default function DashboardPage() {
             index={0}
             onClick={() =>
               openKpi(
-                isTitular ? "Proyectos del área" : "Proyectos activos",
+                isTitular
+                  ? "Proyectos del área"
+                  : isMember
+                    ? "Mis proyectos"
+                    : "Proyectos activos",
                 "PROJECTS",
               )
             }
@@ -1130,7 +1186,7 @@ export default function DashboardPage() {
               </motion.div>
 
               <div className="space-y-3">
-                {projects.length === 0 && (
+                {myProjects.length === 0 && (
                   <motion.div
                     variants={fadeUp}
                     initial="hidden"
@@ -1139,11 +1195,11 @@ export default function DashboardPage() {
                     className="card p-10 text-center"
                   >
                     <p className="text-slate-400 text-sm">
-                      No hay proyectos activos aún.
+                      No tienes proyectos asignados aún.
                     </p>
                   </motion.div>
                 )}
-                {projects.map((project, i) => (
+                {myProjects.map((project, i) => (
                   <motion.div
                     key={project.id}
                     variants={fadeUp}

@@ -60,14 +60,14 @@ model User {
   sessions      Session[]
 
   // Relaciones de la app
-  assignments   Assignment[]
-  createdTasks  Task[]        @relation("TaskCreator")
-  uploadedFiles ProjectFile[] @relation("FileUploader")
-  areas         UserArea[]
-  titularOf     Area[]        @relation("AreaTitular")
-  posts         Post[]
-  sentMessages     Message[] @relation("SentMessages")
-  receivedMessages Message[] @relation("ReceivedMessages")
+  assignments      Assignment[]
+  createdTasks     Task[]        @relation("TaskCreator")
+  uploadedFiles    ProjectFile[] @relation("FileUploader")
+  areas            UserArea[]
+  titularOf        Area[]        @relation("AreaTitular")
+  posts            Post[]
+  sentMessages     Message[]     @relation("SentMessages")
+  receivedMessages Message[]     @relation("ReceivedMessages")
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -203,20 +203,20 @@ model Post {
 }
 
 model Message {
-  id         String   @id @default(cuid())
-  text       String?
-  fileUrl    String?  @db.Text
-  fileName   String?
-  createdAt  DateTime @default(now())
+  id        String   @id @default(cuid())
+  text      String?
+  fileUrl   String?  @db.Text
+  fileName  String?
+  createdAt DateTime @default(now())
 
-  senderId   String
-  sender     User     @relation("SentMessages", fields: [senderId], references: [id], onDelete: Cascade)
+  senderId String
+  sender   User   @relation("SentMessages", fields: [senderId], references: [id], onDelete: Cascade)
 
   receiverId String
-  receiver   User     @relation("ReceivedMessages", fields: [receiverId], references: [id], onDelete: Cascade)
+  receiver   User   @relation("ReceivedMessages", fields: [receiverId], references: [id], onDelete: Cascade)
 
-  projectId  String
-  project    Project  @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  projectId String
+  project   Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
 }
 
 // ─── Enums ─────────────────────────────────────────────────────
