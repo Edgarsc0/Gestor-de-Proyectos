@@ -232,6 +232,15 @@ export default function ProyectosPage() {
     fetchData();
   }, [fetchData]);
 
+  // Lógica de personalización por Rol
+  const userRole = session?.user?.role || "MEMBER";
+  const userId = session?.user?.id;
+  const isAdminLike = userRole === "ADMIN" || userRole === "SUPERADMIN";
+
+  const myArea = areas.find(
+    (a) => a.titular?.id === userId || a.titularId === userId,
+  );
+
   // Pre-seleccionar el área del MEMBER al abrir el modal
   useEffect(() => {
     if (showCreate && userRole === "MEMBER" && memberAreas.length > 0) {
@@ -262,15 +271,6 @@ export default function ProyectosPage() {
       setIsProcessing(false);
     }
   };
-
-  // Lógica de personalización por Rol
-  const userRole = session?.user?.role || "MEMBER";
-  const userId = session?.user?.id;
-  const isAdminLike = userRole === "ADMIN" || userRole === "SUPERADMIN";
-
-  const myArea = areas.find(
-    (a) => a.titular?.id === userId || a.titularId === userId,
-  );
 
   // El backend ya filtra los proyectos según el rol (ADMIN ve todos, TITULAR/MEMBER ven los de su área o asignados).
   const myProjects = projects;
