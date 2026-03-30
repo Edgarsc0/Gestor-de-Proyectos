@@ -60,19 +60,25 @@ export async function DELETE(request) {
     return NextResponse.json({ error: "No autorizado" }, { status: 401 });
 
   try {
-    const { searchParams } = new URL(request.url);
-    const userId = searchParams.get("userId");
-    const projectId = searchParams.get("projectId");
+    const { userId } = await request.json();
 
-    if (!userId || !projectId) {
+    if (!userId) {
       return NextResponse.json({ error: "Faltan datos" }, { status: 400 });
     }
 
-    await prisma.assignment.deleteMany({ where: { userId, projectId } });
+    await prisma.$transaction([
+      // Limpiar relaciones sin onDelete: Cascade
+      prisma.area.updateMany({ where: { titularId: userId }, data: { titularId: null } }),
+      prisma.task.updateMany({ where: { assigneeId: userId }, data: { assigneeId: null } }),
+      prisma.projectFile.deleteMany({ where: { uploadedById: userId } }),
+      // Eliminar el usuario (Account, Session, Assignment, UserArea, Post, Message tienen Cascade)
+      prisma.user.delete({ where: { id: userId } }),
+    ]);
+
     return NextResponse.json({ ok: true });
   } catch (error) {
     return NextResponse.json(
-      { error: "Error al remover usuario" },
+      { error: "Error al eliminar usuario" },
       { status: 500 },
     );
   }
