@@ -4,6 +4,17 @@ import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 
+function deriveStatusFromColumn(columns, columnId) {
+  if (!columnId || !columns?.length) return null;
+  const sorted = [...columns].sort((a, b) => a.order - b.order);
+  const idx = sorted.findIndex((c) => c.id === columnId);
+  if (idx < 0) return null;
+  if (idx === 0) return "PENDING";
+  if (idx === sorted.length - 1) return "COMPLETED";
+  if (sorted.length >= 4 && idx === sorted.length - 2) return "IN_REVIEW";
+  return "IN_PROGRESS";
+}
+
 export async function GET() {
   const session = await getServerSession(authOptions);
   if (!session) return NextResponse.json({ error: "No autorizado" }, { status: 401 });
@@ -31,7 +42,7 @@ export async function GET() {
       take: 8,
       orderBy: { updatedAt: "desc" },
       include: {
-        project: { select: { name: true, color: true } },
+        project: { select: { name: true, color: true, columns: { select: { id: true, order: true } } } },
         assignee: { select: { name: true, image: true } },
       },
     }),
@@ -52,8 +63,7 @@ export async function GET() {
           include: { project: { select: { name: true, color: true } } },
         },
         createdTasks: {
-          where: { status: { not: "COMPLETED" } },
-          select: { id: true, title: true, status: true, priority: true, project: { select: { name: true, color: true } } },
+          select: { id: true, title: true, status: true, columnId: true, priority: true, project: { select: { name: true, color: true, columns: { select: { id: true, order: true } } } } },
           orderBy: { updatedAt: "desc" },
         },
       },
@@ -77,6 +87,23 @@ export async function GET() {
     };
   });
 
+  // Normalize recentTasks status from columnId
+  const normalizedRecentTasks = recentTasks.map((t) => ({
+    ...t,
+    status: deriveStatusFromColumn(t.project?.columns, t.columnId) ?? t.status,
+  }));
+
+  // Normalize members' createdTasks and filter out completed ones
+  const normalizedMembers = members.map((m) => ({
+    ...m,
+    createdTasks: m.createdTasks
+      .map((t) => ({
+        ...t,
+        status: deriveStatusFromColumn(t.project?.columns, t.columnId) ?? t.status,
+      }))
+      .filter((t) => t.status !== "COMPLETED"),
+  }));
+
   return NextResponse.json({
     stats: {
       totalProjects,
@@ -88,8 +115,8 @@ export async function GET() {
       totalMembers,
       completionRate: totalTasks > 0 ? Math.round((completedTasks / totalTasks) * 100) : 0,
     },
-    recentTasks,
+    recentTasks: normalizedRecentTasks,
     projects: projectsWithProgress,
-    members,
+    members: normalizedMembers,
   });
 }

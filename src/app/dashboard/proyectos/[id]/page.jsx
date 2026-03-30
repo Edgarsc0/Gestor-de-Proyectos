@@ -28,6 +28,7 @@ import {
   CalendarDays,
 } from "lucide-react";
 import Select from "@/components/Select";
+import PusherClient from "pusher-js";
 import { DayPicker } from "react-day-picker";
 import "react-day-picker/dist/style.css";
 import { format } from "date-fns";
@@ -333,6 +334,23 @@ export default function ProjectDetailPage() {
   useEffect(() => {
     fetchProject();
   }, [fetchProject]);
+
+  // Escuchar cambios en tareas del proyecto en tiempo real (Pusher)
+  useEffect(() => {
+    if (!id) return;
+    const client = new PusherClient(process.env.NEXT_PUBLIC_PUSHER_KEY, {
+      cluster: process.env.NEXT_PUBLIC_PUSHER_CLUSTER,
+    });
+    const channel = client.subscribe(`project-${id}`);
+    channel.bind("task-updated", () => {
+      fetchProject();
+    });
+    return () => {
+      channel.unbind_all();
+      client.unsubscribe(`project-${id}`);
+      client.disconnect();
+    };
+  }, [id, fetchProject]);
 
   // Actualizar botones de scroll cuando cambien las columnas
   useEffect(() => {

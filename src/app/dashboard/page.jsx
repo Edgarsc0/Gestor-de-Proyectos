@@ -1,7 +1,7 @@
 // src/app/dashboard/page.jsx
 "use client";
 
-import { useEffect, useState, useRef } from "react";
+import { useEffect, useState, useRef, useCallback } from "react";
 import { useSession } from "next-auth/react";
 import { motion, AnimatePresence } from "framer-motion";
 import LoadingScreen from "@/components/LoadingScreen";
@@ -102,12 +102,9 @@ export default function DashboardPage() {
   const isTitular = session?.user?.role === "TITULAR";
   const isMember = session?.user?.role === "MEMBER";
 
-  useEffect(() => {
-    if (status === "loading") return;
+  const loadData = useCallback(() => {
     if (!session) return;
-
     const fetchDashboard = fetch("/api/dashboard").then((r) => r.json());
-
     if (session.user.role === "ADMIN" || session.user.role === "SUPERADMIN") {
       Promise.all([
         fetchDashboard,
@@ -126,7 +123,21 @@ export default function DashboardPage() {
     } else {
       fetchDashboard.then(setData).finally(() => setLoading(false));
     }
-  }, [session, status]);
+  }, [session]);
+
+  useEffect(() => {
+    if (status === "loading") return;
+    loadData();
+  }, [session, status, loadData]);
+
+  // Refrescar al volver a la pestaña
+  useEffect(() => {
+    const handleVisibility = () => {
+      if (document.visibilityState === "visible") loadData();
+    };
+    document.addEventListener("visibilitychange", handleVisibility);
+    return () => document.removeEventListener("visibilitychange", handleVisibility);
+  }, [loadData]);
 
   if (loading || status === "loading") {
     return <LoadingScreen />;

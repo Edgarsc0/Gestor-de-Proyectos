@@ -52,6 +52,15 @@ export default function TareasPage() {
 
   useEffect(() => { fetchData(); }, [fetchData]);
 
+  // Refrescar al volver a la pestaña
+  useEffect(() => {
+    const handleVisibility = () => {
+      if (document.visibilityState === "visible") fetchData();
+    };
+    document.addEventListener("visibilitychange", handleVisibility);
+    return () => document.removeEventListener("visibilitychange", handleVisibility);
+  }, [fetchData]);
+
   const filteredTasks = tasks.filter((t) => {
     if (filterProject && t.projectId !== filterProject) return false;
     if (filterMember && t.assigneeId !== filterMember) return false;

@@ -370,6 +370,15 @@ export default function AreasPage() {
   useEffect(() => { fetchAreas(); }, [fetchAreas]);
   useEffect(() => { if (isAdmin) fetchUsers(); }, [isAdmin, fetchUsers]);
 
+  // Refrescar al volver a la pestaña
+  useEffect(() => {
+    const handleVisibility = () => {
+      if (document.visibilityState === "visible") fetchAreas();
+    };
+    document.addEventListener("visibilitychange", handleVisibility);
+    return () => document.removeEventListener("visibilitychange", handleVisibility);
+  }, [fetchAreas]);
+
   const openDetail = async (area) => {
     setShowForm(false);
     setDetailLoading(true);
