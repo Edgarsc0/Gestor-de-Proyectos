@@ -475,7 +475,7 @@ export default function MensajesPage() {
                         name={contact.user.name}
                         size="sm"
                       />
-                      {isOnline(presenceInfo[contact.user.id]) && (
+                      {isOnline(presenceInfo[contact.user.id]?.lastSeen) && (
                         <span className="absolute bottom-0 right-0 w-2.5 h-2.5 bg-emerald-500 border-2 border-white dark:border-slate-900 rounded-full" />
                       )}
                     </div>
@@ -520,7 +520,7 @@ export default function MensajesPage() {
                   name={activeChat.user.name}
                   size="md"
                 />
-                {isOnline(presenceInfo[activeChat.user.id]) && (
+                {isOnline(presenceInfo[activeChat.user.id]?.lastSeen) && (
                   <span className="absolute bottom-0.5 right-0.5 w-3 h-3 bg-emerald-500 border-2 border-white dark:border-slate-900 rounded-full" />
                 )}
               </div>
@@ -539,7 +539,7 @@ export default function MensajesPage() {
                       </span>
                     </span>
                   ) : (
-                    formatLastSeen(presenceInfo[activeChat.user.id])
+                    formatLastSeen(presenceInfo[activeChat.user.id]?.lastSeen)
                   )}
                 </span>
               </div>
