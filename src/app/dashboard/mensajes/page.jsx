@@ -230,6 +230,15 @@ export default function MensajesPage() {
     return () => clearInterval(interval);
   }, [contactIdsString]);
 
+  // Ping para actualizar lastSeen del usuario actual
+  useEffect(() => {
+    if (!session?.user?.id) return;
+    const ping = () => fetch("/api/user/ping", { method: "POST" }).catch(() => {});
+    ping();
+    const interval = setInterval(ping, 60000); // Cada 60 segundos
+    return () => clearInterval(interval);
+  }, [session?.user?.id]);
+
   const isOnline = (dateString) => {
     if (!dateString) return false;
     // Considerar en línea si su último ping fue hace menos de 2 minutos
