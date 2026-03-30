@@ -136,7 +136,8 @@ export default function DashboardPage() {
       if (document.visibilityState === "visible") loadData();
     };
     document.addEventListener("visibilitychange", handleVisibility);
-    return () => document.removeEventListener("visibilitychange", handleVisibility);
+    return () =>
+      document.removeEventListener("visibilitychange", handleVisibility);
   }, [loadData]);
 
   if (loading || status === "loading") {
