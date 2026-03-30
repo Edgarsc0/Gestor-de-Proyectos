@@ -112,65 +112,65 @@ export default function DashboardPage() {
   if (!data) return null;
   const { stats, recentTasks, projects, members } = data;
 
-  // Inyectar al Titular en todos los proyectos de su área de forma predeterminada
-  const areaTitular = members?.find((m) => m.role === "TITULAR");
-  if (areaTitular && projects) {
-    projects.forEach((p) => {
-      if (!p.assignments) p.assignments = [];
-      if (!p.assignments.some((a) => a.user?.id === areaTitular.id)) {
-        p.assignments.unshift({
-          id: `virtual-${areaTitular.id}-${p.id}`,
-          role: "Titular",
-          user: areaTitular,
-          userId: areaTitular.id,
-          projectId: p.id,
-        });
-      }
-    });
-    if (!areaTitular.assignments) areaTitular.assignments = [];
-    projects.forEach((p) => {
-      if (!areaTitular.assignments.some((a) => a.project?.id === p.id)) {
-        areaTitular.assignments.push({
-          id: `virtual-${areaTitular.id}-${p.id}`,
-          role: "Titular",
-          project: p,
-          projectId: p.id,
-          userId: areaTitular.id,
-        });
-      }
-    });
-  }
-
-  // Cross-populate para asegurar que todos los miembros y proyectos tengan sus referencias cruzadas
+  // Cross-populate y asignación automática por Área
   if (projects && members) {
     projects.forEach((p) => {
-      if (p.assignments) {
-        p.assignments.forEach((a) => {
-          const uid = a.userId || a.user?.id;
-          const member = members.find((m) => m.id === uid);
+      if (!p.assignments) p.assignments = [];
 
-          if (member) {
-            // Aseguramos que la asignación del proyecto tenga el objeto user
-            if (!a.user) a.user = member;
+      members.forEach((m) => {
+        const isInArea =
+          p.areaId &&
+          m.areas?.some(
+            (a) => a.areaId === p.areaId || a.area?.id === p.areaId,
+          );
 
-            // Aseguramos que el miembro tenga la asignación del proyecto
-            if (!member.assignments) member.assignments = [];
-            if (
-              !member.assignments.some(
-                (ma) => ma.projectId === p.id || ma.project?.id === p.id,
-              )
-            ) {
-              member.assignments.push({
-                id: a.id || `assign-${uid}-${p.id}`,
-                role: a.role || "Colaborador",
-                project: p,
-                projectId: p.id,
-                userId: uid,
-              });
-            }
+        // Si el proyecto tiene área y el usuario pertenece a ella, se asigna automáticamente
+        if (isInArea) {
+          if (
+            !p.assignments.some(
+              (a) =>
+                a.userId === m.id ||
+                a.user?.id === m.id ||
+                a.user?.email === m.email,
+            )
+          ) {
+            p.assignments.push({
+              id: `virtual-${m.id}-${p.id}`,
+              role: m.role === "TITULAR" ? "Titular" : "Colaborador",
+              user: m,
+              userId: m.id,
+              projectId: p.id,
+            });
           }
-        });
-      }
+        }
+      });
+
+      // Asegurar referencias cruzadas para asignaciones
+      p.assignments.forEach((a) => {
+        const uid = a.userId || a.user?.id;
+        const member = members.find(
+          (m) => m.id === uid || m.email === a.user?.email,
+        );
+
+        if (member) {
+          if (!a.user) a.user = member;
+
+          if (!member.assignments) member.assignments = [];
+          if (
+            !member.assignments.some(
+              (ma) => ma.projectId === p.id || ma.project?.id === p.id,
+            )
+          ) {
+            member.assignments.push({
+              id: a.id || `assign-${uid}-${p.id}`,
+              role: a.role || "Colaborador",
+              project: p,
+              projectId: p.id,
+              userId: uid,
+            });
+          }
+        }
+      });
     });
   }
 
@@ -179,7 +179,9 @@ export default function DashboardPage() {
     ? projects?.filter((p) =>
         p.assignments?.some(
           (a) =>
-            a.userId === session?.user?.id || a.user?.id === session?.user?.id,
+            a.userId === session?.user?.id ||
+            a.user?.id === session?.user?.id ||
+            a.user?.email === session?.user?.email,
         ),
       ) || []
     : projects || [];
@@ -504,15 +506,13 @@ export default function DashboardPage() {
             }
           />
           <StatCard
-            label={isTitular ? "Integrantes del área" : "Miembros"}
-            value={stats.totalMembers}
-            sub={
-              isTitular
-                ? `${membersInProjects} en proyectos, ${teamMembers.length - membersInProjects} libres`
-                : isMember
-                  ? "en mis proyectos"
-                  : "en el equipo"
+            label={
+              isTitular || isMember
+                ? "Integrantes del área"
+                : "Total de miembros"
             }
+            value={teamMembers.length}
+            sub="Registrados actualmente"
             icon={
               <svg
                 width="20"
@@ -1208,6 +1208,9 @@ export default function DashboardPage() {
                     custom={5 + i}
                     whileHover={{ y: -2, transition: { duration: 0.2 } }}
                     className="card-hover p-5 cursor-pointer"
+                    onClick={() =>
+                      (window.location.href = `/dashboard/proyectos/${project.id}`)
+                    }
                   >
                     <div className="flex items-start gap-4">
                       <div
@@ -1373,16 +1376,17 @@ export default function DashboardPage() {
                       </p>
                       <div className="flex flex-wrap gap-1.5">
                         {member.assignments.map((a) => (
-                          <span
-                            key={a.project.name}
-                            className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full text-[11px] font-medium bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300"
+                          <Link
+                            href={`/dashboard/proyectos/${a.project.id}`}
+                            key={a.project.id}
+                            className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full text-[11px] font-medium bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 hover:bg-slate-200 dark:hover:bg-slate-700 transition-colors"
                           >
                             <span
                               className="w-1.5 h-1.5 rounded-full flex-shrink-0"
                               style={{ backgroundColor: a.project.color }}
                             />
                             {a.project.name}
-                          </span>
+                          </Link>
                         ))}
                       </div>
                     </div>

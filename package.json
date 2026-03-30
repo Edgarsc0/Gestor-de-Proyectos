@@ -19,6 +19,8 @@
     "lucide-react": "^0.460.0",
     "next": "^14.2.18",
     "next-auth": "^4.24.10",
+    "pusher": "^5.3.3",
+    "pusher-js": "^8.4.3",
     "react": "^18.3.1",
     "react-day-picker": "^9.14.0",
     "react-dom": "^18.3.1"

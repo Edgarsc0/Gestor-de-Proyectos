@@ -234,7 +234,11 @@ export default function ProyectosPage() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ ...formData, areaId: formData.areaId || null }),
       });
-      if (!res.ok) throw new Error((await res.json().catch(() => ({}))).error || "Error al crear el proyecto.");
+      if (!res.ok)
+        throw new Error(
+          (await res.json().catch(() => ({}))).error ||
+            "Error al crear el proyecto.",
+        );
       setFormData({ name: "", description: "", color: COLORS[0], areaId: "" });
       setShowCreate(false);
       fetchData();
@@ -254,13 +258,8 @@ export default function ProyectosPage() {
     (a) => a.titular?.id === userId || a.titularId === userId,
   );
 
-  const myProjects = projects.filter((p) => {
-    if (isAdminLike) return true;
-    if (userRole === "TITULAR") {
-      if (myArea && p.areaId === myArea.id) return true;
-    }
-    return p.assignments?.some((a) => a.user?.id === userId);
-  });
+  // El backend ya filtra los proyectos según el rol (ADMIN ve todos, TITULAR/MEMBER ven los de su área o asignados).
+  const myProjects = projects;
 
   // Filtered projects for "all" view
   const filtered =
@@ -270,16 +269,36 @@ export default function ProyectosPage() {
         ? myProjects.filter((p) => !p.areaId)
         : myProjects.filter((p) => p.areaId === areaFilter);
 
-  // For "areas" view: group by area
-  const areaGroups = [
-    ...areas.map((a) => ({
+  // Construir los grupos de áreas dinámicamente
+  const areaMap = new Map();
+  areas.forEach((a) => {
+    areaMap.set(a.id, {
       id: a.id,
       name: a.name,
       color: a.color,
       titular: a.titular,
       isArea: true,
-      projects: myProjects.filter((p) => p.areaId === a.id),
-    })),
+      projects: [],
+    });
+  });
+  myProjects.forEach((p) => {
+    if (p.area && !areaMap.has(p.area.id)) {
+      areaMap.set(p.area.id, {
+        id: p.area.id,
+        name: p.area.name,
+        color: p.area.color,
+        titular: null,
+        isArea: true,
+        projects: [],
+      });
+    }
+    if (p.areaId && areaMap.has(p.areaId)) {
+      areaMap.get(p.areaId).projects.push(p);
+    }
+  });
+
+  const areaGroups = [
+    ...Array.from(areaMap.values()),
     {
       id: "none",
       name: "Sin área",
@@ -289,6 +308,8 @@ export default function ProyectosPage() {
       projects: myProjects.filter((p) => !p.areaId),
     },
   ].filter((g) => (isAdminLike ? true : g.projects.length > 0));
+
+  const filterAreas = areaGroups.filter((g) => g.isArea);
 
   if (loading) {
     return <LoadingScreen />;
@@ -351,9 +372,9 @@ export default function ProyectosPage() {
               whileHover={{ scale: 1.02 }}
               whileTap={{ scale: 0.97 }}
               onClick={() => {
-              setFormData(f => ({ ...f, areaId: myArea?.id || "" }));
-              setShowCreate(true);
-            }}
+                setFormData((f) => ({ ...f, areaId: myArea?.id || "" }));
+                setShowCreate(true);
+              }}
               className="btn-primary"
             >
               <Plus size={16} />
@@ -387,7 +408,9 @@ export default function ProyectosPage() {
                 <div
                   className="p-5 border-b border-slate-100 dark:border-slate-800 bg-white dark:bg-slate-900 flex flex-col sm:flex-row sm:items-center justify-between gap-4 cursor-pointer"
                   onClick={() =>
-                    setExpandedAreaId(expandedAreaId === group.id ? null : group.id)
+                    setExpandedAreaId(
+                      expandedAreaId === group.id ? null : group.id,
+                    )
                   }
                 >
                   <div className="flex items-center gap-3">
@@ -434,7 +457,9 @@ export default function ProyectosPage() {
                       </div>
                     )}
                     <motion.div
-                      animate={{ rotate: expandedAreaId === group.id ? -180 : 0 }}
+                      animate={{
+                        rotate: expandedAreaId === group.id ? -180 : 0,
+                      }}
                       transition={{ duration: 0.15 }}
                     >
                       <ChevronDown size={20} className="text-slate-400" />
@@ -568,7 +593,7 @@ export default function ProyectosPage() {
             className="space-y-4"
           >
             {/* Area filter pills */}
-            {areas.length > 0 && (
+            {filterAreas.length > 0 && (
               <motion.div
                 variants={fadeUp}
                 initial="hidden"
@@ -579,7 +604,7 @@ export default function ProyectosPage() {
                 {[
                   { id: "all", name: "Todos" },
                   { id: "none", name: "Sin área" },
-                  ...areas,
+                  ...filterAreas,
                 ].map((a) => (
                   <button
                     key={a.id}
@@ -635,7 +660,9 @@ export default function ProyectosPage() {
           >
             <Loader2 size={48} className="animate-spin text-brand-500 mb-4" />
             <p className="text-lg font-semibold">Creando proyecto...</p>
-            <p className="text-sm text-slate-300">Por favor, espera un momento</p>
+            <p className="text-sm text-slate-300">
+              Por favor, espera un momento
+            </p>
           </motion.div>
         )}
       </AnimatePresence>
@@ -644,20 +671,36 @@ export default function ProyectosPage() {
       <AnimatePresence>
         {errorMsg && (
           <>
-            <motion.div key="err-bd" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
-              className="fixed inset-0 bg-black/40 backdrop-blur-sm z-[110]" onClick={() => setErrorMsg("")} />
-            <motion.div key="err-md"
+            <motion.div
+              key="err-bd"
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              className="fixed inset-0 bg-black/40 backdrop-blur-sm z-[110]"
+              onClick={() => setErrorMsg("")}
+            />
+            <motion.div
+              key="err-md"
               initial={{ opacity: 0, scale: 0.95, x: "-50%", y: "-50%" }}
               animate={{ opacity: 1, scale: 1, x: "-50%", y: "-50%" }}
               exit={{ opacity: 0, scale: 0.95, x: "-50%", y: "-50%" }}
               className="fixed left-1/2 top-1/2 w-[90%] max-w-md bg-white dark:bg-slate-900 rounded-2xl shadow-xl z-[110] overflow-hidden"
             >
               <div className="p-6">
-                <h3 className="text-lg font-semibold text-slate-900 dark:text-white mb-2">Atención</h3>
-                <p className="text-sm text-slate-500 dark:text-slate-400">{errorMsg}</p>
+                <h3 className="text-lg font-semibold text-slate-900 dark:text-white mb-2">
+                  Atención
+                </h3>
+                <p className="text-sm text-slate-500 dark:text-slate-400">
+                  {errorMsg}
+                </p>
               </div>
               <div className="px-6 py-4 bg-slate-50 dark:bg-slate-800/50 flex justify-end">
-                <button onClick={() => setErrorMsg("")} className="px-4 py-2 text-sm font-medium text-white bg-red-600 hover:bg-red-700 rounded-xl transition-colors">Aceptar</button>
+                <button
+                  onClick={() => setErrorMsg("")}
+                  className="px-4 py-2 text-sm font-medium text-white bg-red-600 hover:bg-red-700 rounded-xl transition-colors"
+                >
+                  Aceptar
+                </button>
               </div>
             </motion.div>
           </>
@@ -706,7 +749,10 @@ export default function ProyectosPage() {
               {userRole === "TITULAR" ? (
                 <div className="input-field flex items-center gap-2 cursor-not-allowed opacity-70">
                   {myArea?.color && (
-                    <span className="w-2.5 h-2.5 rounded-full flex-shrink-0" style={{ background: myArea.color }} />
+                    <span
+                      className="w-2.5 h-2.5 rounded-full flex-shrink-0"
+                      style={{ background: myArea.color }}
+                    />
                   )}
                   <span className="text-sm text-slate-700 dark:text-slate-300">
                     {myArea?.name || "Sin área"}
@@ -764,7 +810,9 @@ export default function ProyectosPage() {
               className="btn-primary flex-1 disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
             >
               {isProcessing ? (
-                <><Loader2 size={15} className="animate-spin" /> Creando...</>
+                <>
+                  <Loader2 size={15} className="animate-spin" /> Creando...
+                </>
               ) : (
                 "Crear proyecto"
               )}

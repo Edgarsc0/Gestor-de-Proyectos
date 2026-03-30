@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
+import { pusher } from "@/lib/pusher";
 
 export async function GET(request) {
   try {
@@ -9,20 +10,12 @@ export async function GET(request) {
     if (!session)
       return NextResponse.json({ error: "No autorizado" }, { status: 401 });
 
-    const { searchParams } = new URL(request.url);
-    const projectId = searchParams.get("projectId");
-
-    if (!projectId) {
-      return NextResponse.json(
-        { error: "Falta el ID del proyecto" },
-        { status: 400 },
-      );
-    }
-
     const messages = await prisma.message.findMany({
       where: {
-        projectId,
-        OR: [{ senderId: session.user.id }, { receiverId: session.user.id }],
+        OR: [
+          { senderId: session.user.id },
+          { receiverId: session.user.id },
+        ],
       },
       orderBy: { createdAt: "asc" },
     });
@@ -63,6 +56,13 @@ export async function POST(request) {
         projectId,
       },
     });
+
+    // Trigger Pusher event for real-time update
+    await pusher.trigger(
+      `private-user-${receiverId}`,
+      "incoming-message",
+      message,
+    );
 
     return NextResponse.json(message);
   } catch (error) {

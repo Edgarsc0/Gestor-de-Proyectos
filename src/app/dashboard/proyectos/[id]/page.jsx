@@ -262,22 +262,39 @@ export default function ProjectDetailPage() {
     }
     const [pData, mData] = await Promise.all([pRes.json(), mRes.json()]);
 
-    // Helper para incluir al Titular virtualmente si no está en la base de datos
-    const injectTitular = (proj, mems) => {
-      const tit = mems.find((m) => m.role === "TITULAR");
-      if (tit) {
-        if (!proj.assignments) proj.assignments = [];
-        if (!proj.assignments.some((a) => a.user?.id === tit.id)) {
-          proj.assignments.unshift({
-            id: `virtual-${tit.id}`,
-            role: "Titular",
-            user: tit,
-            userId: tit.id,
-            projectId: proj.id,
-            assignedAt: new Date().toISOString(),
-          });
+    // Helper para incluir a los miembros del área virtualmente si no están en la base de datos
+    const injectAreaMembers = (proj, mems) => {
+      if (!proj.assignments) proj.assignments = [];
+
+      mems.forEach((m) => {
+        const isInArea =
+          proj.areaId &&
+          m.areas?.some(
+            (a) => a.areaId === proj.areaId || a.area?.id === proj.areaId,
+          );
+
+        if (isInArea) {
+          if (
+            !proj.assignments.some(
+              (a) => a.user?.id === m.id || a.user?.email === m.email,
+            )
+          ) {
+            proj.assignments.push({
+              id: `virtual-${m.id}`,
+              role: m.role === "TITULAR" ? "Titular" : "Colaborador",
+              user: m,
+              userId: m.id,
+              projectId: proj.id,
+              assignedAt: new Date().toISOString(),
+            });
+          }
         }
-      }
+      });
+
+      // Ordenar para que el Titular salga primero
+      proj.assignments.sort((a, b) =>
+        a.role === "Titular" ? -1 : b.role === "Titular" ? 1 : 0,
+      );
       return proj;
     };
 
@@ -301,9 +318,9 @@ export default function ProjectDetailPage() {
       // Recargar con columnas creadas
       const refreshed = await fetch(`/api/projects/${id}`);
       const refreshedData = await refreshed.json();
-      setProject(injectTitular(refreshedData, mData));
+      setProject(injectAreaMembers(refreshedData, mData));
     } else {
-      setProject(injectTitular(pData, mData));
+      setProject(injectAreaMembers(pData, mData));
     }
 
     // Filtramos para que no puedas asignar tareas o proyectos a los Administradores
@@ -1535,7 +1552,7 @@ export default function ProjectDetailPage() {
                               {user.email}
                             </p>
                           </div>
-                          {targetRole !== "TITULAR" && (
+                          {targetRole !== "TITULAR" && userRole !== "MEMBER" && (
                             <button
                               onClick={() => removeMember(user.id)}
                               className="text-xs text-red-400 hover:text-red-600 font-medium flex-shrink-0 transition-colors"
@@ -1595,46 +1612,48 @@ export default function ProjectDetailPage() {
             )}
 
             {/* Add members */}
-            <div>
-              <h3 className="text-xs font-semibold uppercase tracking-wider text-slate-400 mb-3">
-                Añadir al proyecto
-              </h3>
-              <div className="space-y-2">
-                {members
-                  .filter((m) => !assignedIds.has(m.id))
-                  .map((m, i) => (
-                    <motion.div
-                      key={m.id}
-                      variants={fadeUp}
-                      initial="hidden"
-                      animate="show"
-                      custom={i * 0.06}
-                      className="flex items-center gap-3 p-3 card hover:shadow-md transition-shadow"
-                    >
-                      <Avatar src={m.image} name={m.name} size="sm" />
-                      <div className="min-w-0 flex-1">
-                        <p className="text-sm font-medium text-slate-700 dark:text-slate-300 truncate">
-                          {m.name || m.email}
-                        </p>
-                        <p className="text-xs text-slate-400 truncate">
-                          {m.email}
-                        </p>
-                      </div>
-                      <button
-                        onClick={() => assignMember(m.id)}
-                        className="btn-primary text-xs py-1.5"
+            {userRole !== "MEMBER" && (
+              <div>
+                <h3 className="text-xs font-semibold uppercase tracking-wider text-slate-400 mb-3">
+                  Añadir al proyecto
+                </h3>
+                <div className="space-y-2">
+                  {members
+                    .filter((m) => !assignedIds.has(m.id))
+                    .map((m, i) => (
+                      <motion.div
+                        key={m.id}
+                        variants={fadeUp}
+                        initial="hidden"
+                        animate="show"
+                        custom={i * 0.06}
+                        className="flex items-center gap-3 p-3 card hover:shadow-md transition-shadow"
                       >
-                        Asignar
-                      </button>
-                    </motion.div>
-                  ))}
-                {members.filter((m) => !assignedIds.has(m.id)).length === 0 && (
-                  <p className="text-sm text-slate-400 text-center py-6">
-                    Todos los miembros ya están en este proyecto.
-                  </p>
-                )}
+                        <Avatar src={m.image} name={m.name} size="sm" />
+                        <div className="min-w-0 flex-1">
+                          <p className="text-sm font-medium text-slate-700 dark:text-slate-300 truncate">
+                            {m.name || m.email}
+                          </p>
+                          <p className="text-xs text-slate-400 truncate">
+                            {m.email}
+                          </p>
+                        </div>
+                        <button
+                          onClick={() => assignMember(m.id)}
+                          className="btn-primary text-xs py-1.5"
+                        >
+                          Asignar
+                        </button>
+                      </motion.div>
+                    ))}
+                  {members.filter((m) => !assignedIds.has(m.id)).length === 0 && (
+                    <p className="text-sm text-slate-400 text-center py-6">
+                      Todos los miembros ya están en este proyecto.
+                    </p>
+                  )}
+                </div>
               </div>
-            </div>
+            )}
           </motion.div>
         )}
 

@@ -4,17 +4,44 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { signOut, useSession } from "next-auth/react";
-import { useState } from "react";
+import { useState, useEffect, useRef } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { useTheme } from "@/context/ThemeContext";
 import Image from "next/image";
-import { LogOut, ShieldCheck, Building2, ShieldAlert, Crown, Users } from "lucide-react";
+import Pusher from "pusher-js";
+import {
+  LogOut,
+  ShieldCheck,
+  Building2,
+  ShieldAlert,
+  Crown,
+  Users,
+  MessageSquare,
+} from "lucide-react";
 
 const ROLE_LABEL = {
-  SUPERADMIN: { label: "Super Admin",    color: "bg-red-100 text-red-600 dark:bg-red-950/50 dark:text-red-400",       Icon: ShieldAlert },
-  ADMIN:      { label: "Administrador",  color: "bg-brand-100 text-brand-700 dark:bg-brand-950/60 dark:text-brand-400", Icon: ShieldCheck },
-  TITULAR:    { label: "Titular",        color: "bg-amber-100 text-amber-700 dark:bg-amber-950/40 dark:text-amber-400", Icon: Crown },
-  MEMBER:     { label: "Miembro",        color: "bg-slate-100 text-slate-500 dark:bg-slate-800 dark:text-slate-400",    Icon: Users },
+  SUPERADMIN: {
+    label: "Super Admin",
+    color: "bg-red-100 text-red-600 dark:bg-red-950/50 dark:text-red-400",
+    Icon: ShieldAlert,
+  },
+  ADMIN: {
+    label: "Administrador",
+    color:
+      "bg-brand-100 text-brand-700 dark:bg-brand-950/60 dark:text-brand-400",
+    Icon: ShieldCheck,
+  },
+  TITULAR: {
+    label: "Titular",
+    color:
+      "bg-amber-100 text-amber-700 dark:bg-amber-950/40 dark:text-amber-400",
+    Icon: Crown,
+  },
+  MEMBER: {
+    label: "Miembro",
+    color: "bg-slate-100 text-slate-500 dark:bg-slate-800 dark:text-slate-400",
+    Icon: Users,
+  },
 };
 
 const NAV_ITEMS = [
@@ -103,6 +130,11 @@ const NAV_ITEMS = [
       </svg>
     ),
   },
+  {
+    label: "Mensajes",
+    href: "/dashboard/mensajes",
+    icon: <MessageSquare width="20" height="20" strokeWidth="2" />,
+  },
 ];
 
 export default function Sidebar() {
@@ -110,9 +142,74 @@ export default function Sidebar() {
   const { data: session } = useSession();
   const [isHovered, setIsHovered] = useState(false);
   const [mobileOpen, setMobileOpen] = useState(false);
+  const [unreadCount, setUnreadCount] = useState(0);
   const { theme, toggle } = useTheme();
 
   const expanded = isHovered;
+  const unreadCountRef = useRef(0);
+
+  useEffect(() => {
+    unreadCountRef.current = unreadCount;
+  }, [unreadCount]);
+
+  useEffect(() => {
+    const fetchUnread = async () => {
+      if (session?.user) {
+        try {
+          // The cache: "no-store" is still useful for the initial load
+          // and for when the tab becomes visible again.
+          const res = await fetch("/api/messages/unread_info", {
+            cache: "no-store",
+          });
+          if (res.ok) {
+            const { unreadCounts } = await res.json();
+            const total = Object.values(unreadCounts || {}).reduce(
+              (sum, count) => sum + count,
+              0,
+            );
+
+            if (total > unreadCountRef.current && document.hidden) {
+              if (Notification.permission === "granted") {
+                new Notification("Nuevos mensajes", {
+                  body: "Has recibido nuevos mensajes en la plataforma.",
+                  icon: "/anam_logo.png",
+                });
+              }
+            }
+            setUnreadCount(total);
+          }
+        } catch (error) {
+          // Silently fail
+        }
+      }
+    };
+
+    fetchUnread();
+
+    if (!session?.user?.id) return;
+
+    const pusherClient = new Pusher(process.env.NEXT_PUBLIC_PUSHER_KEY, {
+      cluster: process.env.NEXT_PUBLIC_PUSHER_CLUSTER,
+      authEndpoint: "/api/pusher/auth",
+    });
+
+    const channel = pusherClient.subscribe(`private-user-${session.user.id}`);
+
+    const handleNewMessage = () => {
+      // Only update if the messages page is not active to avoid double counting
+      if (!pathname.includes("/dashboard/mensajes")) {
+        fetchUnread();
+      }
+      // The notification logic is already here, which is great.
+    };
+
+    channel.bind("incoming-message", handleNewMessage);
+
+    return () => {
+      channel.unbind("incoming-message", handleNewMessage);
+      pusherClient.unsubscribe(`private-user-${session.user.id}`);
+    };
+  }, [session, pathname]);
 
   return (
     <>
@@ -183,7 +280,7 @@ export default function Sidebar() {
               width: expanded || mobileOpen ? 200 : 40,
               height: expanded || mobileOpen ? 64 : 40,
             }}
-          transition={{ duration: 0.2, ease: [0.16, 1, 0.3, 1] }}
+            transition={{ duration: 0.2, ease: [0.16, 1, 0.3, 1] }}
             className="relative flex-shrink-0"
           >
             <Image
@@ -201,12 +298,19 @@ export default function Sidebar() {
             // Ocultar Tareas y Equipo para SUPERADMIN y ADMIN
             if (
               ["SUPERADMIN", "ADMIN"].includes(session?.user?.role) &&
-              (item.label === "Equipo" || item.label === "Tareas")
+              (item.label === "Equipo" ||
+                item.label === "Tareas" ||
+                item.label === "Mensajes")
             )
               return null;
 
             // Ocultar Áreas para Miembros (solo SUPERADMIN, ADMIN y TITULAR las gestionan)
-            if (!["SUPERADMIN", "ADMIN", "TITULAR"].includes(session?.user?.role) && item.label === "Áreas")
+            if (
+              !["SUPERADMIN", "ADMIN", "TITULAR"].includes(
+                session?.user?.role,
+              ) &&
+              item.label === "Áreas"
+            )
               return null;
 
             const isActive =
@@ -251,6 +355,22 @@ export default function Sidebar() {
                     </motion.span>
                   )}
                 </AnimatePresence>
+                {item.label === "Mensajes" && unreadCount > 0 && (
+                  <AnimatePresence>
+                    {expanded || mobileOpen ? (
+                      <motion.span
+                        initial={{ scale: 0 }}
+                        animate={{ scale: 1 }}
+                        exit={{ scale: 0 }}
+                        className="ml-auto bg-red-500 text-white text-[10px] font-bold w-5 h-5 flex items-center justify-center rounded-full"
+                      >
+                        {unreadCount > 9 ? "9+" : unreadCount}
+                      </motion.span>
+                    ) : (
+                      <span className="absolute top-1.5 right-1.5 w-2 h-2 bg-red-500 rounded-full border-2 border-white dark:border-slate-950" />
+                    )}
+                  </AnimatePresence>
+                )}
               </Link>
             );
           })}
@@ -264,7 +384,13 @@ export default function Sidebar() {
                 <Link
                   href="/dashboard/admin"
                   onClick={() => setMobileOpen(false)}
-                  title={!expanded ? (isSuperAdmin ? "Panel de Control" : "Accesos") : undefined}
+                  title={
+                    !expanded
+                      ? isSuperAdmin
+                        ? "Panel de Control"
+                        : "Accesos"
+                      : undefined
+                  }
                   className={`relative flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium
                   transition-all duration-150 whitespace-nowrap mt-1
                   ${
@@ -277,10 +403,16 @@ export default function Sidebar() {
                     <motion.span
                       layoutId="activeBar"
                       className="absolute left-0 inset-y-1 w-[3px] bg-brand-600 dark:bg-brand-500 rounded-full"
-                      transition={{ type: "spring", stiffness: 500, damping: 35 }}
+                      transition={{
+                        type: "spring",
+                        stiffness: 500,
+                        damping: 35,
+                      }}
                     />
                   )}
-                  <span className={`flex-shrink-0 ${isActive ? "text-brand-700 dark:text-brand-400" : ""}`}>
+                  <span
+                    className={`flex-shrink-0 ${isActive ? "text-brand-700 dark:text-brand-400" : ""}`}
+                  >
                     <ShieldCheck size={20} />
                   </span>
                   <AnimatePresence>
@@ -372,62 +504,65 @@ export default function Sidebar() {
         </motion.button>
 
         {/* User */}
-        {session?.user && (() => {
-          const roleCfg = ROLE_LABEL[session.user.role] || ROLE_LABEL.MEMBER;
-          const RoleIcon = roleCfg.Icon;
-          return (
-            <div className="p-2 border-t border-slate-100 dark:border-slate-800 overflow-hidden">
-              <div className="flex items-center gap-3 px-2 py-2 rounded-xl hover:bg-slate-50 dark:hover:bg-slate-800/50 transition-colors">
-                {session.user.image ? (
-                  <img
-                    src={session.user.image}
-                    alt=""
-                    className="w-8 h-8 rounded-full flex-shrink-0 ring-2 ring-brand-200 dark:ring-brand-900"
-                    referrerPolicy="no-referrer"
-                  />
-                ) : (
-                  <div className="w-8 h-8 bg-gradient-to-br from-brand-500 to-gold-500 rounded-full flex items-center justify-center text-xs font-bold text-white flex-shrink-0">
-                    {session.user.name?.charAt(0) || "?"}
-                  </div>
-                )}
-                <AnimatePresence>
-                  {(expanded || mobileOpen) && (
-                    <motion.div
-                      initial={{ opacity: 0 }}
-                      animate={{ opacity: 1 }}
-                      exit={{ opacity: 0 }}
-                      transition={{ duration: 0.1 }}
-                      className="min-w-0 flex-1"
-                    >
-                      <p className="text-sm font-medium text-slate-700 dark:text-slate-200 truncate leading-tight">
-                        {session.user.name}
-                      </p>
-                      <span className={`inline-flex items-center gap-1 mt-0.5 text-[10px] font-semibold px-1.5 py-0.5 rounded-md ${roleCfg.color}`}>
-                        <RoleIcon size={9} />
-                        {roleCfg.label}
-                      </span>
-                    </motion.div>
+        {session?.user &&
+          (() => {
+            const roleCfg = ROLE_LABEL[session.user.role] || ROLE_LABEL.MEMBER;
+            const RoleIcon = roleCfg.Icon;
+            return (
+              <div className="p-2 border-t border-slate-100 dark:border-slate-800 overflow-hidden">
+                <div className="flex items-center gap-3 px-2 py-2 rounded-xl hover:bg-slate-50 dark:hover:bg-slate-800/50 transition-colors">
+                  {session.user.image ? (
+                    <img
+                      src={session.user.image}
+                      alt=""
+                      className="w-8 h-8 rounded-full flex-shrink-0 ring-2 ring-brand-200 dark:ring-brand-900"
+                      referrerPolicy="no-referrer"
+                    />
+                  ) : (
+                    <div className="w-8 h-8 bg-gradient-to-br from-brand-500 to-gold-500 rounded-full flex items-center justify-center text-xs font-bold text-white flex-shrink-0">
+                      {session.user.name?.charAt(0) || "?"}
+                    </div>
                   )}
-                </AnimatePresence>
-                <AnimatePresence>
-                  {(expanded || mobileOpen) && (
-                    <motion.button
-                      initial={{ opacity: 0 }}
-                      animate={{ opacity: 1 }}
-                      exit={{ opacity: 0 }}
-                      transition={{ duration: 0.1 }}
-                      onClick={() => signOut({ callbackUrl: "/login" })}
-                      title="Cerrar sesión"
-                      className="flex-shrink-0 p-1.5 rounded-lg text-slate-400 hover:text-brand-600 hover:bg-brand-50 dark:hover:text-brand-400 dark:hover:bg-brand-950/40 transition-all"
-                    >
-                      <LogOut size={16} />
-                    </motion.button>
-                  )}
-                </AnimatePresence>
+                  <AnimatePresence>
+                    {(expanded || mobileOpen) && (
+                      <motion.div
+                        initial={{ opacity: 0 }}
+                        animate={{ opacity: 1 }}
+                        exit={{ opacity: 0 }}
+                        transition={{ duration: 0.1 }}
+                        className="min-w-0 flex-1"
+                      >
+                        <p className="text-sm font-medium text-slate-700 dark:text-slate-200 truncate leading-tight">
+                          {session.user.name}
+                        </p>
+                        <span
+                          className={`inline-flex items-center gap-1 mt-0.5 text-[10px] font-semibold px-1.5 py-0.5 rounded-md ${roleCfg.color}`}
+                        >
+                          <RoleIcon size={9} />
+                          {roleCfg.label}
+                        </span>
+                      </motion.div>
+                    )}
+                  </AnimatePresence>
+                  <AnimatePresence>
+                    {(expanded || mobileOpen) && (
+                      <motion.button
+                        initial={{ opacity: 0 }}
+                        animate={{ opacity: 1 }}
+                        exit={{ opacity: 0 }}
+                        transition={{ duration: 0.1 }}
+                        onClick={() => signOut({ callbackUrl: "/login" })}
+                        title="Cerrar sesión"
+                        className="flex-shrink-0 p-1.5 rounded-lg text-slate-400 hover:text-brand-600 hover:bg-brand-50 dark:hover:text-brand-400 dark:hover:bg-brand-950/40 transition-all"
+                      >
+                        <LogOut size={16} />
+                      </motion.button>
+                    )}
+                  </AnimatePresence>
+                </div>
               </div>
-            </div>
-          );
-        })()}
+            );
+          })()}
       </motion.aside>
     </>
   );
