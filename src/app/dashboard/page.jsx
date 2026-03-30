@@ -45,6 +45,29 @@ const fadeUp = {
   }),
 };
 
+const STAT_STYLES = {
+  brand: {
+    bar: "bg-brand-500",
+    icon: "bg-brand-50 dark:bg-brand-950/60 text-brand-600 dark:text-brand-400",
+    num: "text-brand-700 dark:text-brand-300",
+  },
+  emerald: {
+    bar: "bg-emerald-500",
+    icon: "bg-emerald-50 dark:bg-emerald-950/60 text-emerald-600 dark:text-emerald-400",
+    num: "text-emerald-700 dark:text-emerald-300",
+  },
+  amber: {
+    bar: "bg-amber-500",
+    icon: "bg-amber-50 dark:bg-amber-950/60 text-amber-600 dark:text-amber-400",
+    num: "text-amber-700 dark:text-amber-300",
+  },
+  violet: {
+    bar: "bg-violet-500",
+    icon: "bg-violet-50 dark:bg-violet-950/60 text-violet-600 dark:text-violet-400",
+    num: "text-violet-700 dark:text-violet-300",
+  },
+};
+
 export default function DashboardPage() {
   const { data: session, status } = useSession();
   const [data, setData] = useState(null);
@@ -1563,29 +1586,6 @@ export default function DashboardPage() {
     </div>
   );
 }
-
-const STAT_STYLES = {
-  brand: {
-    bar: "bg-brand-500",
-    icon: "bg-brand-50 dark:bg-brand-950/60 text-brand-600 dark:text-brand-400",
-    num: "text-brand-700 dark:text-brand-300",
-  },
-  emerald: {
-    bar: "bg-emerald-500",
-    icon: "bg-emerald-50 dark:bg-emerald-950/60 text-emerald-600 dark:text-emerald-400",
-    num: "text-emerald-700 dark:text-emerald-300",
-  },
-  amber: {
-    bar: "bg-amber-500",
-    icon: "bg-amber-50 dark:bg-amber-950/60 text-amber-600 dark:text-amber-400",
-    num: "text-amber-700 dark:text-amber-300",
-  },
-  violet: {
-    bar: "bg-violet-500",
-    icon: "bg-violet-50 dark:bg-violet-950/60 text-violet-600 dark:text-violet-400",
-    num: "text-violet-700 dark:text-violet-300",
-  },
-};
 
 function StatCard({ label, value, sub, icon, color, index, onClick }) {
   const count = useCounter(value, 500);
