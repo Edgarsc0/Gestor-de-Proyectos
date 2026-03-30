@@ -1,7 +1,7 @@
 // src/app/dashboard/areas/page.jsx
 "use client";
 
-import { useEffect, useState, useCallback, forwardRef } from "react";
+import { useEffect, useState, useCallback, forwardRef, useRef } from "react";
 import Link from "next/link";
 import { motion, AnimatePresence } from "framer-motion";
 import { useSession } from "next-auth/react";
@@ -35,6 +35,63 @@ function UserAvatar({ user, size = 9 }) {
   ) : (
     <div className={`${cls} bg-gradient-to-br from-brand-600 to-brand-800 flex items-center justify-center text-white font-bold text-sm ring-2 ring-white dark:ring-slate-800`}>
       {user?.name?.charAt(0) || user?.email?.charAt(0) || "?"}
+    </div>
+  );
+}
+
+/* ─── MultiSelect ───────────────────────────────────────────── */
+function MultiSelect({ values = [], onChange, options = [], placeholder = "Sin titular asignado" }) {
+  const [open, setOpen] = useState(false);
+  const ref = useRef(null);
+
+  useEffect(() => {
+    if (!open) return;
+    const handler = (e) => { if (ref.current && !ref.current.contains(e.target)) setOpen(false); };
+    document.addEventListener("mousedown", handler);
+    return () => document.removeEventListener("mousedown", handler);
+  }, [open]);
+
+  const toggle = (val) => {
+    if (values.includes(val)) onChange(values.filter(v => v !== val));
+    else onChange([...values, val]);
+  };
+
+  const selectedLabels = options.filter(o => values.includes(o.value));
+
+  return (
+    <div ref={ref} className="relative">
+      <button type="button" onClick={() => setOpen(o => !o)}
+        className="w-full flex items-center justify-between gap-2 px-4 py-2.5 text-sm rounded-xl bg-white dark:bg-slate-800/80 border border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-200 hover:border-brand-400 dark:hover:border-brand-500 focus:outline-none transition-all cursor-pointer select-none">
+        <span className="flex flex-wrap gap-1 min-w-0 flex-1">
+          {selectedLabels.length === 0
+            ? <span className="text-slate-400">{placeholder}</span>
+            : selectedLabels.map(o => (
+              <span key={o.value} className="inline-flex items-center gap-1 px-2 py-0.5 rounded-lg bg-brand-50 dark:bg-brand-950/40 text-brand-700 dark:text-brand-400 text-xs font-medium">
+                {o.label}
+                <span onMouseDown={e => { e.stopPropagation(); toggle(o.value); }} className="cursor-pointer hover:text-red-500">×</span>
+              </span>
+            ))
+          }
+        </span>
+        <ChevronRight size={14} className={`text-slate-400 flex-shrink-0 transition-transform ${open ? "rotate-90" : ""}`} />
+      </button>
+      {open && (
+        <div className="absolute top-full left-0 right-0 mt-1 z-50 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-xl shadow-xl overflow-hidden">
+          <div className="py-1 max-h-56 overflow-y-auto">
+            {options.map(opt => {
+              const checked = values.includes(opt.value);
+              return (
+                <button key={opt.value} type="button"
+                  onMouseDown={e => { e.preventDefault(); toggle(opt.value); }}
+                  className={`w-full flex items-center justify-between gap-3 px-3.5 py-2.5 text-sm text-left transition-colors ${checked ? "bg-brand-50 dark:bg-brand-950/40 text-brand-700 dark:text-brand-400" : "text-slate-700 dark:text-slate-200 hover:bg-slate-50 dark:hover:bg-slate-800"}`}>
+                  <span className="truncate">{opt.label}</span>
+                  {checked && <Check size={14} className="flex-shrink-0 text-brand-600 dark:text-brand-400" strokeWidth={2.5} />}
+                </button>
+              );
+            })}
+          </div>
+        </div>
+      )}
     </div>
   );
 }
@@ -104,10 +161,12 @@ const AreaFormPanel = forwardRef(({ form, setForm, onSave, onCancel, editing, us
           value={form.description} onChange={e => setForm(f => ({ ...f, description: e.target.value }))} />
       </div>
       <div className="space-y-1">
-        <label className="text-xs font-medium text-slate-500 uppercase tracking-wider">Titular</label>
-        <Select value={form.titularId} onChange={v => setForm(f => ({ ...f, titularId: v }))}
-          placeholder="Sin titular asignado"
-          options={[{ value: "", label: "Sin titular asignado" }, ...users.map(u => ({ value: u.id, label: u.name || u.email }))]}
+        <label className="text-xs font-medium text-slate-500 uppercase tracking-wider">Titulares</label>
+        <MultiSelect
+          values={form.titularIds}
+          onChange={v => setForm(f => ({ ...f, titularIds: v }))}
+          placeholder="Sin titulares asignados"
+          options={users.map(u => ({ value: u.id, label: u.name || u.email }))}
         />
       </div>
       <div className="space-y-2">
@@ -208,20 +267,24 @@ function AreaDetailPanel({ area, onClose, onEdit, isAdmin }) {
           </div>
         )}
 
-        {/* Titular */}
+        {/* Titulares */}
         <div className="px-6 py-5 border-b border-slate-100 dark:border-slate-800">
           <p className="text-xs font-semibold uppercase tracking-wider text-slate-400 mb-3 flex items-center gap-1.5">
-            <Crown size={12} /> Titular del área
+            <Crown size={12} /> Titular{area.titulares?.length !== 1 ? "es" : ""} del área
           </p>
-          {area.titular ? (
-            <div className="flex items-center gap-3 p-3 rounded-xl bg-slate-50 dark:bg-slate-800/60 border border-slate-100 dark:border-slate-800">
-              <UserAvatar user={area.titular} size={10} />
-              <div className="min-w-0 flex-1">
-                <p className="text-sm font-semibold text-slate-800 dark:text-white truncate">{area.titular.name}</p>
-                <p className="text-xs text-slate-400 truncate">{area.titular.email}</p>
-              </div>
-              <span className="text-[10px] font-semibold px-2 py-0.5 rounded-full text-white flex-shrink-0"
-                style={{ backgroundColor: area.color }}>Titular</span>
+          {area.titulares?.length > 0 ? (
+            <div className="space-y-2">
+              {area.titulares.map(t => (
+                <div key={t.userId} className="flex items-center gap-3 p-3 rounded-xl bg-slate-50 dark:bg-slate-800/60 border border-slate-100 dark:border-slate-800">
+                  <UserAvatar user={t.user} size={10} />
+                  <div className="min-w-0 flex-1">
+                    <p className="text-sm font-semibold text-slate-800 dark:text-white truncate">{t.user?.name}</p>
+                    <p className="text-xs text-slate-400 truncate">{t.user?.email}</p>
+                  </div>
+                  <span className="text-[10px] font-semibold px-2 py-0.5 rounded-full text-white flex-shrink-0"
+                    style={{ backgroundColor: area.color }}>Titular</span>
+                </div>
+              ))}
             </div>
           ) : (
             <div className="p-3 rounded-xl bg-slate-50 dark:bg-slate-800/60 border border-dashed border-slate-200 dark:border-slate-700 text-sm text-slate-400 text-center">
@@ -253,7 +316,7 @@ function AreaDetailPanel({ area, onClose, onEdit, isAdmin }) {
           ) : (
             <div className="space-y-1 max-h-52 overflow-y-auto pr-0.5">
               {filteredMembers.map(user => {
-                const isTitular = area.titular?.id === user.id;
+                const isTitular = area.titulares?.some(t => t.userId === user.id || t.user?.id === user.id);
                 const projectCount = area.projects?.filter(p => p.assignments?.some(a => a.userId === user.id)).length || 0;
                 return (
                   <div key={user.id} className="flex items-center gap-3 px-3 py-2.5 rounded-xl hover:bg-slate-50 dark:hover:bg-slate-800/40 transition-colors">
@@ -347,7 +410,7 @@ export default function AreasPage() {
   // Form panel (ADMIN)
   const [showForm, setShowForm] = useState(false);
   const [editing, setEditing] = useState(null);
-  const [form, setForm] = useState({ name: "", description: "", color: "#8B1515", titularId: "" });
+  const [form, setForm] = useState({ name: "", description: "", color: "#8B1515", titularIds: [] });
 
   const [confirmDialog, setConfirmDialog] = useState({ isOpen: false });
   const [isProcessing, setIsProcessing] = useState(false);
@@ -391,14 +454,19 @@ export default function AreasPage() {
 
   const openNew = () => {
     setEditing(null);
-    setForm({ name: "", description: "", color: "#8B1515", titularId: "" });
+    setForm({ name: "", description: "", color: "#8B1515", titularIds: [] });
     setShowDetail(false);
     setShowForm(true);
   };
 
   const openEdit = (area) => {
     setEditing(area);
-    setForm({ name: area.name, description: area.description || "", color: area.color, titularId: area.titularId || "" });
+    setForm({
+      name: area.name,
+      description: area.description || "",
+      color: area.color,
+      titularIds: area.titulares?.map(t => t.userId) || [],
+    });
     setShowDetail(false);
     setShowForm(true);
   };
@@ -408,14 +476,15 @@ export default function AreasPage() {
     try {
       const method = editing ? "PATCH" : "POST";
       const url = editing ? `/api/admin/areas/${editing.id}` : "/api/admin/areas";
-      const payload = { ...form, titularId: form.titularId || null };
+      const payload = { ...form, titularIds: form.titularIds };
       const res = await fetch(url, { method, headers: { "Content-Type": "application/json" }, body: JSON.stringify(payload) });
       if (!res.ok) throw new Error((await res.json().catch(() => ({}))).error || "Error al guardar");
 
-      if (form.titularId) {
-        const target = users.find(u => u.id === form.titularId);
+      // Asignar rol TITULAR a los nuevos titulares
+      for (const tid of form.titularIds) {
+        const target = users.find(u => u.id === tid);
         if (target && target.role !== "SUPERADMIN" && target.role !== "ADMIN" && target.role !== "TITULAR") {
-          await fetch("/api/admin/users", { method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ userId: form.titularId, role: "TITULAR" }) });
+          await fetch("/api/admin/users", { method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ userId: tid, role: "TITULAR" }) });
         }
       }
 
@@ -533,12 +602,18 @@ export default function AreasPage() {
                       )}
                     </div>
 
-                    {/* Titular */}
-                    {area.titular ? (
-                      <div className="flex items-center gap-2 py-2 px-3 bg-slate-50 dark:bg-slate-800/60 rounded-xl">
-                        <UserAvatar user={area.titular} size={6} />
-                        <p className="text-xs font-medium text-slate-700 dark:text-slate-300 truncate flex-1">{area.titular.name || area.titular.email}</p>
-                        <span className="text-[9px] font-semibold px-1.5 py-0.5 rounded-full text-white flex-shrink-0" style={{ backgroundColor: area.color }}>Titular</span>
+                    {/* Titulares */}
+                    {area.titulares?.length > 0 ? (
+                      <div className="flex flex-wrap items-center gap-1.5 py-2 px-3 bg-slate-50 dark:bg-slate-800/60 rounded-xl">
+                        {area.titulares.map(t => (
+                          <div key={t.userId} className="flex items-center gap-1.5">
+                            <UserAvatar user={t.user} size={6} />
+                            <p className="text-xs font-medium text-slate-700 dark:text-slate-300 truncate">{t.user?.name?.split(" ")[0] || t.user?.email}</p>
+                          </div>
+                        ))}
+                        <span className="text-[9px] font-semibold px-1.5 py-0.5 rounded-full text-white ml-auto flex-shrink-0" style={{ backgroundColor: area.color }}>
+                          {area.titulares.length > 1 ? `${area.titulares.length} titulares` : "Titular"}
+                        </span>
                       </div>
                     ) : (
                       <div className="py-2 px-3 bg-slate-50 dark:bg-slate-800/60 rounded-xl text-xs text-slate-400 text-center">Sin titular</div>

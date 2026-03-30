@@ -62,11 +62,14 @@ export async function POST(req) {
   // Recopilar asignaciones iniciales
   const initialAssignments = [];
 
-  // Auto-asignar titular del área
+  // Auto-asignar titulares del área
   if (areaId) {
-    const area = await prisma.area.findUnique({ where: { id: areaId } });
-    if (area?.titularId) {
-      initialAssignments.push({ userId: area.titularId, role: "Titular" });
+    const area = await prisma.area.findUnique({
+      where: { id: areaId },
+      include: { titulares: { select: { userId: true } } },
+    });
+    for (const t of area?.titulares || []) {
+      initialAssignments.push({ userId: t.userId, role: "Titular" });
     }
   }
 

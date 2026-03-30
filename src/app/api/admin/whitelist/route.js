@@ -52,11 +52,12 @@ export async function POST(req) {
           create: { userId: existing.id, areaId: assignedAreaId },
           update: {},
         });
-        // Si es titular, actualizar el titularId del área
+        // Si es titular, agregar como titular del área
         if (assignedRole === "TITULAR") {
-          await prisma.area.update({
-            where: { id: assignedAreaId },
-            data: { titularId: existing.id },
+          await prisma.areaTitular.upsert({
+            where: { areaId_userId: { areaId: assignedAreaId, userId: existing.id } },
+            create: { areaId: assignedAreaId, userId: existing.id },
+            update: {},
           });
         }
       }

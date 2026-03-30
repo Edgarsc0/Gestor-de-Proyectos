@@ -171,17 +171,21 @@ export default function AreaDetailPage() {
             </div>
           </div>
 
-          {/* Titular row */}
-          {area.titular && (
-            <div className="mt-5 pt-5 border-t border-slate-100 dark:border-slate-700/60 flex items-center gap-3">
+          {/* Titulares row */}
+          {area.titulares?.length > 0 && (
+            <div className="mt-5 pt-5 border-t border-slate-100 dark:border-slate-700/60 flex flex-wrap items-center gap-3">
               <div className="flex items-center gap-1.5 text-xs text-slate-400">
                 <Crown size={13} />
-                <span>Titular</span>
+                <span>Titular{area.titulares.length !== 1 ? "es" : ""}</span>
               </div>
-              <Avatar src={area.titular.image} name={area.titular.name} size="xs" />
-              <p className="text-sm font-medium text-slate-700 dark:text-slate-300">
-                {area.titular.name || area.titular.email}
-              </p>
+              {area.titulares.map(t => (
+                <div key={t.userId} className="flex items-center gap-2">
+                  <Avatar src={t.user?.image} name={t.user?.name} size="xs" />
+                  <p className="text-sm font-medium text-slate-700 dark:text-slate-300">
+                    {t.user?.name || t.user?.email}
+                  </p>
+                </div>
+              ))}
             </div>
           )}
         </div>
@@ -287,7 +291,7 @@ export default function AreaDetailPage() {
               const userProjectCount = area.projects?.filter(p =>
                 p.assignments?.some(a => a.userId === user.id)
               ).length || 0;
-              const isTitular = area.titular?.id === user.id;
+              const isTitular = area.titulares?.some(t => t.user?.id === user.id || t.userId === user.id);
               return (
                 <motion.div key={user.id} variants={fadeUp} initial="hidden" animate="show"
                   custom={i * 0.06} className="card p-4 flex items-center gap-3">

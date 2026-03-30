@@ -686,20 +686,27 @@ export default function DashboardPage() {
                       </div>
                     </div>
 
-                    <div className="mb-5 p-3 rounded-xl bg-slate-50 dark:bg-slate-800/50 flex items-center justify-between border border-slate-100 dark:border-slate-800">
-                      <div className="text-[10px] text-slate-400 uppercase tracking-wider font-bold">
-                        Titular
+                    <div className="mb-5 p-3 rounded-xl bg-slate-50 dark:bg-slate-800/50 flex items-center justify-between border border-slate-100 dark:border-slate-800 gap-2">
+                      <div className="text-[10px] text-slate-400 uppercase tracking-wider font-bold flex-shrink-0">
+                        Titular{area.titulares?.length !== 1 ? "es" : ""}
                       </div>
-                      {area.titular ? (
-                        <div className="flex items-center gap-2">
-                          <Avatar
-                            src={area.titular.image}
-                            name={area.titular.name}
-                            size="xs"
-                          />
-                          <span className="text-sm font-medium text-slate-700 dark:text-slate-300">
-                            {area.titular.name?.split(" ")[0] || "Titular"}
-                          </span>
+                      {area.titulares?.length > 0 ? (
+                        <div className="flex flex-wrap items-center gap-2 justify-end">
+                          {area.titulares.map((t) => (
+                            <div
+                              key={t.userId}
+                              className="flex items-center gap-1.5"
+                            >
+                              <Avatar
+                                src={t.user?.image}
+                                name={t.user?.name}
+                                size="xs"
+                              />
+                              <span className="text-sm font-medium text-slate-700 dark:text-slate-300">
+                                {t.user?.name?.split(" ")[0] || "Titular"}
+                              </span>
+                            </div>
+                          ))}
                         </div>
                       ) : (
                         <span className="text-xs text-slate-400 italic">

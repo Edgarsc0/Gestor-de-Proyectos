@@ -49,11 +49,12 @@ export const authOptions = {
           create: { userId: user.id, areaId: entry.assignedAreaId },
           update: {},
         });
-        // Si es TITULAR, actualizar el titular del área
+        // Si es TITULAR, agregar como titular del área
         if (entry.assignedRole === "TITULAR") {
-          await prisma.area.update({
-            where: { id: entry.assignedAreaId },
-            data: { titularId: user.id },
+          await prisma.areaTitular.upsert({
+            where: { areaId_userId: { areaId: entry.assignedAreaId, userId: user.id } },
+            create: { areaId: entry.assignedAreaId, userId: user.id },
+            update: {},
           });
         }
       }

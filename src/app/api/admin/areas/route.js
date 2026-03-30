@@ -9,7 +9,7 @@ export async function GET() {
 
   const areas = await prisma.area.findMany({
     include: {
-      titular: { select: { id: true, name: true, email: true, image: true } },
+      titulares: { include: { user: { select: { id: true, name: true, email: true, image: true } } } },
       _count: { select: { users: true, projects: true } },
     },
     orderBy: { name: "asc" },
@@ -21,13 +21,20 @@ export async function POST(req) {
   const { error } = await requireAdmin();
   if (error) return error;
 
-  const { name, description, color, titularId } = await req.json();
+  const { name, description, color, titularIds } = await req.json();
   if (!name) return NextResponse.json({ error: "Nombre requerido" }, { status: 400 });
 
+  const ids = Array.isArray(titularIds) ? titularIds.filter(Boolean) : [];
+
   const area = await prisma.area.create({
-    data: { name, description, color: color || "#8B1515", titularId: titularId || null },
+    data: {
+      name,
+      description,
+      color: color || "#8B1515",
+      titulares: ids.length ? { create: ids.map(userId => ({ userId })) } : undefined,
+    },
     include: {
-      titular: { select: { id: true, name: true, email: true, image: true } },
+      titulares: { include: { user: { select: { id: true, name: true, email: true, image: true } } } },
       _count: { select: { users: true, projects: true } },
     },
   });

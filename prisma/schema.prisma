@@ -65,7 +65,7 @@ model User {
   createdTasks     Task[]        @relation("TaskCreator")
   uploadedFiles    ProjectFile[] @relation("FileUploader")
   areas            UserArea[]
-  titularOf        Area[]        @relation("AreaTitular")
+  titularOf        AreaTitular[]
   posts            Post[]
   sentMessages     Message[]     @relation("SentMessages")
   receivedMessages Message[]     @relation("ReceivedMessages")
@@ -80,14 +80,21 @@ model Area {
   description String?
   color       String  @default("#8B1515")
 
-  titular   User?   @relation("AreaTitular", fields: [titularId], references: [id])
-  titularId String?
-
-  users    UserArea[]
-  projects Project[]
+  titulares AreaTitular[]
+  users     UserArea[]
+  projects  Project[]
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
+}
+
+model AreaTitular {
+  area   Area   @relation(fields: [areaId], references: [id], onDelete: Cascade)
+  areaId String
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+  userId String
+
+  @@id([areaId, userId])
 }
 
 model UserArea {

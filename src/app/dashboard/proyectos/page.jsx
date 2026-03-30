@@ -238,7 +238,7 @@ export default function ProyectosPage() {
   const isAdminLike = userRole === "ADMIN" || userRole === "SUPERADMIN";
 
   const myArea = areas.find(
-    (a) => a.titular?.id === userId || a.titularId === userId,
+    (a) => a.titulares?.some(t => t.userId === userId || t.user?.id === userId),
   );
 
   // Pre-seleccionar el área del MEMBER al abrir el modal

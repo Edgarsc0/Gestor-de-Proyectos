@@ -22,7 +22,7 @@ export async function GET() {
 
   const areas = await prisma.area.findMany({
     include: {
-      titular: { select: { id: true, name: true, email: true, image: true } },
+      titulares: { include: { user: { select: { id: true, name: true, email: true, image: true } } } },
       projects: {
         include: {
           tasks: { select: { id: true, status: true, columnId: true } },

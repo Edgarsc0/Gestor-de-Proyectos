@@ -638,11 +638,14 @@ function UsersTab() {
         body: JSON.stringify({ userId, action: "add" }),
       });
 
-      // 3. Establecer como titular del área
+      // 3. Agregar como titular del área (manteniendo titulares existentes)
+      const currentArea = areas.find(a => a.id === areaId);
+      const existingIds = currentArea?.titulares?.map(t => t.userId) || [];
+      const titularIds = [...new Set([...existingIds, userId])];
       await fetch(`/api/admin/areas/${areaId}`, {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ titularId: userId }),
+        body: JSON.stringify({ titularIds }),
       });
 
       await load();

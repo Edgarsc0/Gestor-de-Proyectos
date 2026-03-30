@@ -12,7 +12,7 @@ export async function GET(req, { params }) {
   const area = await prisma.area.findUnique({
     where: { id: params.id },
     include: {
-      titular: { select: { id: true, name: true, email: true, image: true } },
+      titulares: { include: { user: { select: { id: true, name: true, email: true, image: true } } } },
       projects: {
         include: {
           tasks: { select: { id: true, status: true } },

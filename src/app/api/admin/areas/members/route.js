@@ -15,7 +15,7 @@ export async function POST(req) {
 
     // Buscar el área del que este usuario es Titular
     const titularArea = await prisma.area.findFirst({
-      where: { titularId: session.user.id }
+      where: { titulares: { some: { userId: session.user.id } } },
     });
 
     if (!titularArea) {

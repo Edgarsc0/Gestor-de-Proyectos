@@ -54,6 +54,33 @@ export async function POST(request) {
   }
 }
 
+export async function PATCH(request) {
+  const session = await getServerSession(authOptions);
+  if (!session)
+    return NextResponse.json({ error: "No autorizado" }, { status: 401 });
+
+  try {
+    const { userId, role } = await request.json();
+
+    if (!userId || !role) {
+      return NextResponse.json({ error: "Faltan datos" }, { status: 400 });
+    }
+
+    const user = await prisma.user.update({
+      where: { id: userId },
+      data: { role },
+      select: { id: true, name: true, email: true, role: true },
+    });
+
+    return NextResponse.json(user);
+  } catch (error) {
+    return NextResponse.json(
+      { error: "Error al cambiar el rol" },
+      { status: 500 },
+    );
+  }
+}
+
 export async function DELETE(request) {
   const session = await getServerSession(authOptions);
   if (!session)
@@ -68,7 +95,6 @@ export async function DELETE(request) {
 
     await prisma.$transaction([
       // Limpiar relaciones sin onDelete: Cascade
-      prisma.area.updateMany({ where: { titularId: userId }, data: { titularId: null } }),
       prisma.task.updateMany({ where: { assigneeId: userId }, data: { assigneeId: null } }),
       prisma.projectFile.deleteMany({ where: { uploadedById: userId } }),
       // Eliminar el usuario (Account, Session, Assignment, UserArea, Post, Message tienen Cascade)

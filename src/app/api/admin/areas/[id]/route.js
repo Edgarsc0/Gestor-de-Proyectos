@@ -7,17 +7,22 @@ export async function PATCH(req, { params }) {
   const { error } = await requireAdmin();
   if (error) return error;
 
-  const { name, description, color, titularId } = await req.json();
+  const { name, description, color, titularIds } = await req.json();
+  const ids = Array.isArray(titularIds) ? titularIds.filter(Boolean) : [];
+
   const area = await prisma.area.update({
     where: { id: params.id },
     data: {
       ...(name && { name }),
       ...(description !== undefined && { description }),
       ...(color && { color }),
-      titularId: titularId ?? null,
+      titulares: {
+        deleteMany: {},
+        create: ids.map(userId => ({ userId })),
+      },
     },
     include: {
-      titular: { select: { id: true, name: true, email: true, image: true } },
+      titulares: { include: { user: { select: { id: true, name: true, email: true, image: true } } } },
       _count: { select: { users: true, projects: true } },
     },
   });
