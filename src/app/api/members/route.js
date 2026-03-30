@@ -35,6 +35,15 @@ export async function POST(req) {
     return NextResponse.json({ error: "userId y projectId son requeridos" }, { status: 400 });
   }
 
+  // Solo pueden asignar: SUPERADMIN, ADMIN, TITULAR, o el creador del proyecto
+  const caller = await prisma.user.findUnique({ where: { id: session.user.id } });
+  if (caller.role === "MEMBER") {
+    const project = await prisma.project.findUnique({ where: { id: projectId }, select: { createdById: true } });
+    if (!project || project.createdById !== session.user.id) {
+      return NextResponse.json({ error: "Sin permiso para asignar miembros" }, { status: 403 });
+    }
+  }
+
   const assignment = await prisma.assignment.upsert({
     where: { userId_projectId: { userId, projectId } },
     update: { role: role || "Colaborador" },
@@ -59,6 +68,15 @@ export async function DELETE(req) {
 
   if (!userId || !projectId) {
     return NextResponse.json({ error: "userId y projectId son requeridos" }, { status: 400 });
+  }
+
+  // Solo pueden quitar: SUPERADMIN, ADMIN, TITULAR, o el creador del proyecto
+  const caller = await prisma.user.findUnique({ where: { id: session.user.id } });
+  if (caller.role === "MEMBER") {
+    const project = await prisma.project.findUnique({ where: { id: projectId }, select: { createdById: true } });
+    if (!project || project.createdById !== session.user.id) {
+      return NextResponse.json({ error: "Sin permiso para quitar miembros" }, { status: 403 });
+    }
   }
 
   await prisma.assignment.delete({

@@ -163,6 +163,7 @@ export default function ProjectDetailPage() {
   const { data: session } = useSession();
 
   const userRole = session?.user?.role;
+  const userId = session?.user?.id;
   const isSuperAdmin = userRole === "SUPERADMIN";
   const TABS_FOR_ROLE = ["Tablero", "Equipo", "Archivos", "Foro", "Mensajes"];
 
@@ -561,7 +562,10 @@ export default function ProjectDetailPage() {
   };
 
   const moveTask = (taskId, newColumnId) =>
-    updateTask(taskId, { columnId: newColumnId, status: getStatusForColumn(newColumnId) });
+    updateTask(taskId, {
+      columnId: newColumnId,
+      status: getStatusForColumn(newColumnId),
+    });
 
   const createColumn = async () => {
     if (!newColumnName.trim()) {
@@ -1468,10 +1472,12 @@ export default function ProjectDetailPage() {
                               )}
                               {task.dueDate && (
                                 <span className="text-[11px] text-slate-400">
-                                  {new Date(task.dueDate).toLocaleDateString(
-                                    "es-MX",
-                                    { month: "short", day: "numeric" },
-                                  )}
+                                  {new Date(
+                                    task.dueDate.slice(0, 10) + "T00:00:00",
+                                  ).toLocaleDateString("es-MX", {
+                                    month: "short",
+                                    day: "numeric",
+                                  })}
                                 </span>
                               )}
                               {task.assignee ? (
@@ -1580,14 +1586,16 @@ export default function ProjectDetailPage() {
                               {user.email}
                             </p>
                           </div>
-                          {targetRole !== "TITULAR" && userRole !== "MEMBER" && (
-                            <button
-                              onClick={() => removeMember(user.id)}
-                              className="text-xs text-red-400 hover:text-red-600 font-medium flex-shrink-0 transition-colors"
-                            >
-                              Quitar
-                            </button>
-                          )}
+                          {targetRole !== "TITULAR" &&
+                            (userRole !== "MEMBER" ||
+                              project.createdById === userId) && (
+                              <button
+                                onClick={() => removeMember(user.id)}
+                                className="text-xs text-red-400 hover:text-red-600 font-medium flex-shrink-0 transition-colors"
+                              >
+                                Quitar
+                              </button>
+                            )}
                         </div>
                         <div className="flex items-center gap-3 text-xs text-slate-500">
                           <span>
@@ -1640,7 +1648,7 @@ export default function ProjectDetailPage() {
             )}
 
             {/* Add members */}
-            {userRole !== "MEMBER" && (
+            {(userRole !== "MEMBER" || project.createdById === userId) && (
               <div>
                 <h3 className="text-xs font-semibold uppercase tracking-wider text-slate-400 mb-3">
                   Añadir al proyecto
@@ -1674,7 +1682,8 @@ export default function ProjectDetailPage() {
                         </button>
                       </motion.div>
                     ))}
-                  {members.filter((m) => !assignedIds.has(m.id)).length === 0 && (
+                  {members.filter((m) => !assignedIds.has(m.id)).length ===
+                    0 && (
                     <p className="text-sm text-slate-400 text-center py-6">
                       Todos los miembros ya están en este proyecto.
                     </p>
@@ -2511,8 +2520,15 @@ export default function ProjectDetailPage() {
                       type="button"
                       onClick={() => {
                         const newStatus = getStatusForColumn(c.id);
-                        updateTask(editTask.id, { columnId: c.id, status: newStatus });
-                        setEditTask({ ...editTask, columnId: c.id, status: newStatus });
+                        updateTask(editTask.id, {
+                          columnId: c.id,
+                          status: newStatus,
+                        });
+                        setEditTask({
+                          ...editTask,
+                          columnId: c.id,
+                          status: newStatus,
+                        });
                       }}
                       className={`px-3 py-1.5 rounded-lg text-xs font-medium border flex items-center gap-1.5 transition-colors
                         ${isSelected ? "bg-slate-100 dark:bg-slate-800 border-slate-300 dark:border-slate-600 shadow-sm" : "bg-slate-50 border-slate-200 dark:bg-slate-800/30 dark:border-slate-700 hover:border-slate-300 dark:hover:border-slate-600"}`}
@@ -2617,9 +2633,13 @@ export default function ProjectDetailPage() {
                     }
                   >
                     {editTask.dueDate
-                      ? format(new Date(editTask.dueDate), "PPP", {
-                          locale: es,
-                        })
+                      ? format(
+                          new Date(editTask.dueDate.slice(0, 10) + "T00:00:00"),
+                          "PPP",
+                          {
+                            locale: es,
+                          },
+                        )
                       : "Seleccionar fecha"}
                   </span>
                 </button>
@@ -2760,7 +2780,9 @@ export default function ProjectDetailPage() {
           <DayPicker
             mode="single"
             selected={
-              editTask?.dueDate ? new Date(editTask.dueDate) : undefined
+              editTask?.dueDate
+                ? new Date(editTask.dueDate.slice(0, 10) + "T00:00:00")
+                : undefined
             }
             onSelect={(date) => {
               const newDate = date ? format(date, "yyyy-MM-dd") : null;

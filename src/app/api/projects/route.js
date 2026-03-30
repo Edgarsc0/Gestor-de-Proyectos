@@ -87,6 +87,7 @@ export async function POST(req) {
       description,
       color: color || "#8B1515",
       areaId: areaId || null,
+      createdById: creatorId,
       assignments: {
         create: initialAssignments,
       },

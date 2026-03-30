@@ -69,6 +69,7 @@ model User {
   posts            Post[]
   sentMessages     Message[]     @relation("SentMessages")
   receivedMessages Message[]     @relation("ReceivedMessages")
+  createdProjects  Project[]     @relation("ProjectCreator")
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -130,6 +131,9 @@ model Project {
 
   area   Area?   @relation(fields: [areaId], references: [id])
   areaId String?
+
+  createdBy   User?   @relation("ProjectCreator", fields: [createdById], references: [id])
+  createdById String?
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
