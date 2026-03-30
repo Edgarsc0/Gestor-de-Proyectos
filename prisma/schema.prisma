@@ -221,6 +221,23 @@ model Message {
   project   Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
 }
 
+model FileChunk {
+  id          String   @id @default(cuid())
+  uploadId    String
+  chunkIndex  Int
+  totalChunks Int
+  data        String   @db.Text
+  fileName    String
+  fileType    String?
+  senderId    String
+  receiverId  String
+  projectId   String
+  createdAt   DateTime @default(now())
+
+  @@unique([uploadId, chunkIndex])
+  @@index([uploadId])
+}
+
 // ─── Enums ─────────────────────────────────────────────────────
 
 enum Role {

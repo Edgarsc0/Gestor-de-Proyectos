@@ -57,12 +57,17 @@ export async function POST(request) {
       },
     });
 
-    // Trigger Pusher event for real-time update
-    await pusher.trigger(
-      `private-user-${receiverId}`,
-      "incoming-message",
-      message,
-    );
+    // Trigger Pusher event — enviar solo metadata (sin fileUrl) para no superar el límite de 10KB de Pusher
+    await pusher.trigger(`private-user-${receiverId}`, "incoming-message", {
+      id: message.id,
+      senderId: message.senderId,
+      receiverId: message.receiverId,
+      projectId: message.projectId,
+      text: message.text,
+      fileName: message.fileName,
+      isRead: message.isRead,
+      createdAt: message.createdAt,
+    });
 
     return NextResponse.json(message);
   } catch (error) {

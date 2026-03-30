@@ -34,8 +34,11 @@ export default function MensajesPage() {
   const [presenceInfo, setPresenceInfo] = useState({});
   const [typingUsers, setTypingUsers] = useState({});
   const [isTyping, setIsTyping] = useState(false);
+  const [uploadProgress, setUploadProgress] = useState(null); // null = sin subida activa
   const typingTimeoutRef = useRef(null);
   const messagesEndRef = useRef(null);
+
+  const CHUNK_SIZE = 3 * 1024 * 1024; // 3 MB por chunk (binario)
 
   useEffect(() => {
     if (status === "loading") return;
@@ -142,12 +145,15 @@ export default function MensajesPage() {
 
     const handleNewMessage = (newMessage) => {
       setMessages((prev) => {
-        // Evitar duplicados
-        if (prev.find((msg) => msg.id === newMessage.id)) {
-          return prev;
-        }
+        if (prev.find((msg) => msg.id === newMessage.id)) return prev;
         return [...prev, newMessage];
       });
+
+      // Si el mensaje tiene archivo, jalar mensajes completos para obtener el fileUrl
+      // (Pusher solo envía metadata liviana para no superar su límite de 10KB)
+      if (newMessage.fileName) {
+        fetchMessages();
+      }
 
       // Actualizar contador de no leídos si el chat no está activo
       if (activeChat?.user.id !== newMessage.senderId) {
@@ -285,45 +291,121 @@ export default function MensajesPage() {
     }
   };
 
+  // Convierte un ArrayBuffer a string base64 sin desbordamiento de pila
+  const arrayBufferToBase64 = (buffer) => {
+    const bytes = new Uint8Array(buffer);
+    let binary = "";
+    for (let i = 0; i < bytes.length; i++) binary += String.fromCharCode(bytes[i]);
+    return btoa(binary);
+  };
+
   const handleSendMessage = async () => {
     if ((!newMessage.trim() && !newMessageFile) || !activeChat) return;
 
     if (!activeChat.project) {
-      setErrorMsg(
-        "Necesitas al menos un proyecto en el área para poder enviar mensajes.",
-      );
+      setErrorMsg("Necesitas al menos un proyecto en el área para poder enviar mensajes.");
       return;
     }
 
-    let fileUrl = null;
-    let fileName = null;
+    const receiverId = activeChat.user.id;
+    const projectId = activeChat.project.id;
+
+    // ── Archivo adjunto ──────────────────────────────────────────
     if (newMessageFile) {
-      if (newMessageFile.size > 5 * 1024 * 1024) {
-        setErrorMsg("El archivo no debe superar los 5MB.");
+      const MAX_SIZE = 50 * 1024 * 1024; // 50 MB total
+      if (newMessageFile.size > MAX_SIZE) {
+        setErrorMsg("El archivo no debe superar los 50 MB.");
         return;
       }
-      fileUrl = await fileToBase64(newMessageFile);
-      fileName = newMessageFile.name;
+
+      try {
+        const fileBuffer = await newMessageFile.arrayBuffer();
+        const fileName = newMessageFile.name;
+        const fileType = newMessageFile.type;
+        const totalChunks = Math.ceil(fileBuffer.byteLength / CHUNK_SIZE);
+
+        if (totalChunks === 1) {
+          // ── Archivo pequeño: subida normal ──────────────────────
+          setUploadProgress(50);
+          const fileUrl = await fileToBase64(newMessageFile);
+          const res = await fetch("/api/messages", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ text: newMessage || null, fileUrl, fileName, receiverId, projectId }),
+          });
+          if (!res.ok) throw new Error("Error al enviar el archivo.");
+          const savedMsg = await res.json();
+          setMessages((prev) => [...prev, savedMsg]);
+        } else {
+          // ── Archivo grande: subida por chunks ───────────────────
+          const uploadId = crypto.randomUUID();
+          let savedMsg = null;
+
+          for (let i = 0; i < totalChunks; i++) {
+            const start = i * CHUNK_SIZE;
+            const end = Math.min(start + CHUNK_SIZE, fileBuffer.byteLength);
+            const chunkBase64 = arrayBufferToBase64(fileBuffer.slice(start, end));
+
+            setUploadProgress(Math.round(((i + 1) / totalChunks) * 100));
+
+            const res = await fetch("/api/messages/upload-chunk", {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({
+                uploadId,
+                chunkIndex: i,
+                totalChunks,
+                data: chunkBase64,
+                fileName,
+                fileType,
+                receiverId,
+                projectId,
+              }),
+            });
+            if (!res.ok) throw new Error(`Error al subir el tramo ${i + 1} de ${totalChunks}.`);
+            const result = await res.json();
+            if (result.id) savedMsg = result; // último chunk devuelve el mensaje completo
+          }
+
+          if (savedMsg) setMessages((prev) => [...prev, savedMsg]);
+        }
+
+        // Si había texto además del archivo, enviarlo por separado
+        if (newMessage.trim()) {
+          const res = await fetch("/api/messages", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ text: newMessage, receiverId, projectId }),
+          });
+          if (res.ok) {
+            const textMsg = await res.json();
+            setMessages((prev) => [...prev, textMsg]);
+          }
+        }
+
+        setNewMessage("");
+        setNewMessageFile(null);
+      } catch (err) {
+        setErrorMsg(err.message);
+      } finally {
+        setUploadProgress(null);
+        setIsTyping(false);
+        clearTimeout(typingTimeoutRef.current);
+      }
+      return;
     }
 
+    // ── Solo texto ───────────────────────────────────────────────
     try {
       const res = await fetch("/api/messages", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          text: newMessage,
-          fileUrl,
-          fileName,
-          receiverId: activeChat.user.id,
-          projectId: activeChat.project.id,
-        }),
+        body: JSON.stringify({ text: newMessage, receiverId, projectId }),
       });
       if (!res.ok) throw new Error("Error al enviar el mensaje.");
       const savedMsg = await res.json();
-
       setMessages((prev) => [...prev, savedMsg]);
       setNewMessage("");
-      setNewMessageFile(null);
       setIsTyping(false);
       clearTimeout(typingTimeoutRef.current);
     } catch (err) {
@@ -485,11 +567,20 @@ export default function MensajesPage() {
                       >
                         {contact.user.name || contact.user.email}
                       </p>
-                      {contact.user.role === "TITULAR" && (
+                      {typingUsers[contact.user.id] ? (
+                        <p className="text-[10px] text-brand-600 dark:text-brand-400 font-semibold mt-0.5 flex items-center gap-1">
+                          escribiendo
+                          <span className="flex gap-[2px] items-center">
+                            <motion.span animate={{ opacity: [0, 1, 0] }} transition={{ repeat: Infinity, duration: 1, delay: 0 }} className="w-1 h-1 bg-brand-500 rounded-full inline-block" />
+                            <motion.span animate={{ opacity: [0, 1, 0] }} transition={{ repeat: Infinity, duration: 1, delay: 0.2 }} className="w-1 h-1 bg-brand-500 rounded-full inline-block" />
+                            <motion.span animate={{ opacity: [0, 1, 0] }} transition={{ repeat: Infinity, duration: 1, delay: 0.4 }} className="w-1 h-1 bg-brand-500 rounded-full inline-block" />
+                          </span>
+                        </p>
+                      ) : contact.user.role === "TITULAR" ? (
                         <p className="text-[10px] text-brand-600 dark:text-brand-400 font-semibold mt-0.5">
                           Titular de Área
                         </p>
-                      )}
+                      ) : null}
                       {unreadInfo[contact.user.id] && (
                         <span className="absolute right-0 top-1/2 -translate-y-1/2 bg-red-500 text-white text-[10px] font-bold w-5 h-5 flex items-center justify-center rounded-full">
                           {unreadInfo[contact.user.id]}
@@ -589,11 +680,39 @@ export default function MensajesPage() {
                   {activeChat.user.name?.split(" ")[0]}
                 </p>
               )}
+              {typingUsers[activeChat.user.id] && (
+                <div className="flex justify-start">
+                  <div className="bg-slate-100 dark:bg-slate-800 px-4 py-3 rounded-2xl rounded-tl-sm shadow-sm flex items-center gap-1.5">
+                    <motion.span animate={{ y: [0, -4, 0] }} transition={{ repeat: Infinity, duration: 0.8, delay: 0 }} className="w-2 h-2 bg-slate-400 dark:bg-slate-500 rounded-full inline-block" />
+                    <motion.span animate={{ y: [0, -4, 0] }} transition={{ repeat: Infinity, duration: 0.8, delay: 0.15 }} className="w-2 h-2 bg-slate-400 dark:bg-slate-500 rounded-full inline-block" />
+                    <motion.span animate={{ y: [0, -4, 0] }} transition={{ repeat: Infinity, duration: 0.8, delay: 0.3 }} className="w-2 h-2 bg-slate-400 dark:bg-slate-500 rounded-full inline-block" />
+                  </div>
+                </div>
+              )}
               <div ref={messagesEndRef} />
             </div>
 
             <div className="p-3 border-t border-slate-100 dark:border-slate-800/60 flex flex-col gap-2 bg-slate-50/30 dark:bg-slate-900/30">
-              {newMessageFile && (
+              {uploadProgress !== null && (
+                <div className="flex flex-col gap-1">
+                  <div className="flex justify-between items-center">
+                    <span className="text-xs text-brand-600 dark:text-brand-400 font-medium">
+                      Subiendo archivo… {uploadProgress}%
+                    </span>
+                    <span className="text-xs text-slate-400">
+                      {uploadProgress < 100 ? `Tramo ${Math.ceil(uploadProgress / (100 / Math.ceil(newMessageFile?.size / CHUNK_SIZE || 1)))} de ${Math.ceil(newMessageFile?.size / CHUNK_SIZE || 1)}` : "Procesando…"}
+                    </span>
+                  </div>
+                  <div className="w-full h-1.5 bg-slate-200 dark:bg-slate-700 rounded-full overflow-hidden">
+                    <motion.div
+                      className="h-full bg-brand-500 rounded-full"
+                      animate={{ width: `${uploadProgress}%` }}
+                      transition={{ duration: 0.3 }}
+                    />
+                  </div>
+                </div>
+              )}
+              {newMessageFile && !uploadProgress && (
                 <div className="flex items-center gap-2 bg-brand-50/50 dark:bg-brand-900/10 border border-brand-100 dark:border-brand-900/30 text-brand-700 dark:text-brand-300 px-3 py-1.5 rounded-lg text-xs w-fit">
                   <span className="text-base">
                     {fileIcon(newMessageFile.type)}
@@ -638,7 +757,7 @@ export default function MensajesPage() {
                 />
                 <button
                   onClick={handleSendMessage}
-                  disabled={!newMessage.trim() && !newMessageFile}
+                  disabled={(!newMessage.trim() && !newMessageFile) || uploadProgress !== null}
                   className="btn-primary px-4 py-2.5 disabled:opacity-50 disabled:cursor-not-allowed"
                 >
                   <Send size={18} />
