@@ -58,6 +58,7 @@ model User {
   role          Role      @default(MEMBER)
   accounts      Account[]
   sessions      Session[]
+  lastSeen      DateTime  @default(now())
 
   // Relaciones de la app
   assignments      Assignment[]

@@ -211,6 +211,18 @@ export default function Sidebar() {
     };
   }, [session, pathname]);
 
+  // Mantener al usuario "En línea"
+  useEffect(() => {
+    const updatePresence = () => {
+      if (session?.user?.id) {
+        fetch("/api/user/presence", { method: "POST" }).catch(() => {});
+      }
+    };
+    updatePresence(); // Llamada inicial
+    const presenceInterval = setInterval(updatePresence, 60000); // Cada 60 segundos
+    return () => clearInterval(presenceInterval);
+  }, [session?.user?.id]);
+
   return (
     <>
       {/* Mobile toggle */}

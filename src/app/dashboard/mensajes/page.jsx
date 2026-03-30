@@ -31,6 +31,10 @@ export default function MensajesPage() {
   const [errorMsg, setErrorMsg] = useState("");
   const [searchTerm, setSearchTerm] = useState("");
   const [unreadInfo, setUnreadInfo] = useState({});
+  const [presenceInfo, setPresenceInfo] = useState({});
+  const [typingUsers, setTypingUsers] = useState({});
+  const [isTyping, setIsTyping] = useState(false);
+  const typingTimeoutRef = useRef(null);
   const messagesEndRef = useRef(null);
 
   useEffect(() => {
@@ -154,10 +158,24 @@ export default function MensajesPage() {
       }
     };
 
+    const handleTyping = (data) => {
+      setTypingUsers((prev) => ({ ...prev, [data.senderId]: true }));
+      // Remover "escribiendo..." después de 3 segundos
+      setTimeout(() => {
+        setTypingUsers((prev) => {
+          const newState = { ...prev };
+          delete newState[data.senderId];
+          return newState;
+        });
+      }, 3000);
+    };
+
     channel.bind("incoming-message", handleNewMessage);
+    channel.bind("incoming-typing", handleTyping);
 
     return () => {
       channel.unbind("incoming-message", handleNewMessage);
+      channel.unbind("incoming-typing", handleTyping);
       pusherClient.unsubscribe(`private-user-${session.user.id}`);
     };
   }, [fetchMessages, session?.user?.id, activeChat]);
@@ -193,6 +211,42 @@ export default function MensajesPage() {
     }
   }, [errorMsg]);
 
+  // Obtener estado de presencia periódicamente
+  const contactIdsString = useMemo(() => {
+    const ids = members.map((m) => m.id);
+    return ids.sort().join(",");
+  }, [members]);
+
+  useEffect(() => {
+    const fetchPresence = async () => {
+      if (!contactIdsString) return;
+      try {
+        const res = await fetch(`/api/user/presence?ids=${contactIdsString}`, { cache: "no-store" });
+        if (res.ok) setPresenceInfo(await res.json());
+      } catch (e) {}
+    };
+    fetchPresence();
+    const interval = setInterval(fetchPresence, 30000); // Revisar quién está en línea cada 30s
+    return () => clearInterval(interval);
+  }, [contactIdsString]);
+
+  const isOnline = (dateString) => {
+    if (!dateString) return false;
+    // Considerar en línea si su último ping fue hace menos de 2 minutos
+    return Date.now() - new Date(dateString).getTime() < 120000;
+  };
+
+  const formatLastSeen = (dateString) => {
+    if (!dateString) return "Desconectado";
+    if (isOnline(dateString)) return "En línea";
+    const date = new Date(dateString);
+    const isToday = new Date().toDateString() === date.toDateString();
+    if (isToday) {
+      return `Hoy a las ${date.toLocaleTimeString("es-MX", { hour: "2-digit", minute: "2-digit" })}`;
+    }
+    return `${date.toLocaleDateString("es-MX", { day: "numeric", month: "short" })} a las ${date.toLocaleTimeString("es-MX", { hour: "2-digit", minute: "2-digit" })}`;
+  };
+
   const fileToBase64 = (file) =>
     new Promise((resolve, reject) => {
       const reader = new FileReader();
@@ -200,6 +254,27 @@ export default function MensajesPage() {
       reader.onload = () => resolve(reader.result);
       reader.onerror = (error) => reject(error);
     });
+
+  const handleInputChange = (e) => {
+    setNewMessage(e.target.value);
+    if (!isTyping && activeChat) {
+      setIsTyping(true);
+      fetch("/api/messages/typing", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ receiverId: activeChat.user.id }),
+      }).catch(() => {});
+
+      typingTimeoutRef.current = setTimeout(() => {
+        setIsTyping(false);
+      }, 2000);
+    } else if (isTyping) {
+      clearTimeout(typingTimeoutRef.current);
+      typingTimeoutRef.current = setTimeout(() => {
+        setIsTyping(false);
+      }, 2000);
+    }
+  };
 
   const handleSendMessage = async () => {
     if ((!newMessage.trim() && !newMessageFile) || !activeChat) return;
@@ -240,6 +315,8 @@ export default function MensajesPage() {
       setMessages((prev) => [...prev, savedMsg]);
       setNewMessage("");
       setNewMessageFile(null);
+      setIsTyping(false);
+      clearTimeout(typingTimeoutRef.current);
     } catch (err) {
       setErrorMsg(err.message);
     }
@@ -383,11 +460,16 @@ export default function MensajesPage() {
                     onClick={() => handleContactClick(contact)}
                     className={`w-full flex items-center gap-3 p-2.5 rounded-xl transition-all text-left border ${isActive ? "bg-brand-50 dark:bg-brand-900/20 border-transparent shadow-sm" : hasUnread ? "bg-brand-50/50 dark:bg-brand-900/20 border-brand-200 dark:border-brand-800/50" : "border-transparent hover:bg-slate-50 dark:hover:bg-slate-800/50"}`}
                   >
-                    <Avatar
-                      src={contact.user.image}
-                      name={contact.user.name}
-                      size="sm"
-                    />
+                    <div className="relative flex-shrink-0">
+                      <Avatar
+                        src={contact.user.image}
+                        name={contact.user.name}
+                        size="sm"
+                      />
+                      {isOnline(presenceInfo[contact.user.id]) && (
+                        <span className="absolute bottom-0 right-0 w-2.5 h-2.5 bg-emerald-500 border-2 border-white dark:border-slate-900 rounded-full" />
+                      )}
+                    </div>
                     <div className="min-w-0 flex-1 relative">
                       <p
                         className={`text-sm truncate ${isActive ? "text-brand-700 dark:text-brand-300 font-medium" : hasUnread ? "text-brand-700 dark:text-brand-400 font-bold" : "text-slate-700 dark:text-slate-300 font-medium"}`}
@@ -423,17 +505,33 @@ export default function MensajesPage() {
         {activeChat ? (
           <>
             <div className="p-4 border-b border-slate-100 dark:border-slate-800/60 flex items-center gap-3 bg-slate-50/50 dark:bg-slate-900/50">
-              <Avatar
-                src={activeChat.user.image}
-                name={activeChat.user.name}
-                size="md"
-              />
+              <div className="relative flex-shrink-0">
+                <Avatar
+                  src={activeChat.user.image}
+                  name={activeChat.user.name}
+                  size="md"
+                />
+                {isOnline(presenceInfo[activeChat.user.id]) && (
+                  <span className="absolute bottom-0.5 right-0.5 w-3 h-3 bg-emerald-500 border-2 border-white dark:border-slate-900 rounded-full" />
+                )}
+              </div>
               <div>
                 <span className="font-semibold text-base text-slate-800 dark:text-slate-200 block leading-tight">
                   {activeChat.user.name}
                 </span>
-                <span className="text-[11px] text-brand-600 dark:text-brand-400 font-medium">
-                  Chat privado
+                <span className={`text-[11px] font-medium ${typingUsers[activeChat.user.id] ? "text-brand-600 dark:text-brand-400" : "text-slate-500 dark:text-slate-400"}`}>
+                  {typingUsers[activeChat.user.id] ? (
+                    <span className="flex items-center gap-1">
+                      escribiendo
+                      <span className="flex gap-[2px]">
+                        <motion.span animate={{ opacity: [0, 1, 0] }} transition={{ repeat: Infinity, duration: 1.5, delay: 0 }} className="w-1 h-1 bg-brand-500 rounded-full" />
+                        <motion.span animate={{ opacity: [0, 1, 0] }} transition={{ repeat: Infinity, duration: 1.5, delay: 0.2 }} className="w-1 h-1 bg-brand-500 rounded-full" />
+                        <motion.span animate={{ opacity: [0, 1, 0] }} transition={{ repeat: Infinity, duration: 1.5, delay: 0.4 }} className="w-1 h-1 bg-brand-500 rounded-full" />
+                      </span>
+                    </span>
+                  ) : (
+                    formatLastSeen(presenceInfo[activeChat.user.id])
+                  )}
                 </span>
               </div>
             </div>
