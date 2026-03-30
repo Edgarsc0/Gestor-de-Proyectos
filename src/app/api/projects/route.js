@@ -59,12 +59,23 @@ export async function POST(req) {
 
   const { areaId } = body;
 
-  let titularAssignment = [];
+  // Recopilar asignaciones iniciales
+  const initialAssignments = [];
+
+  // Auto-asignar titular del área
   if (areaId) {
     const area = await prisma.area.findUnique({ where: { id: areaId } });
-    if (area && area.titularId) {
-      titularAssignment = [{ userId: area.titularId, role: "Titular" }];
+    if (area?.titularId) {
+      initialAssignments.push({ userId: area.titularId, role: "Titular" });
     }
+  }
+
+  // Auto-asignar al creador si no es ya el titular
+  const creatorId = session.user.id;
+  if (!initialAssignments.some((a) => a.userId === creatorId)) {
+    const creatorRole =
+      session.user.role === "TITULAR" ? "Titular" : "Colaborador";
+    initialAssignments.push({ userId: creatorId, role: creatorRole });
   }
 
   const project = await prisma.project.create({
@@ -74,7 +85,7 @@ export async function POST(req) {
       color: color || "#8B1515",
       areaId: areaId || null,
       assignments: {
-        create: titularAssignment,
+        create: initialAssignments,
       },
     },
   });

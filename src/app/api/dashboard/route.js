@@ -38,7 +38,8 @@ export async function GET() {
     prisma.project.findMany({
       where: { status: "ACTIVE" },
       include: {
-        tasks: { select: { status: true } },
+        tasks: { select: { status: true, columnId: true } },
+        columns: { select: { id: true, order: true } },
         assignments: {
           include: { user: { select: { name: true, image: true } } },
         },
@@ -60,10 +61,14 @@ export async function GET() {
     }),
   ]);
 
-  // Calcular progreso por proyecto
+  // Calcular progreso por proyecto (usa la última columna o status COMPLETED)
   const projectsWithProgress = projects.map((p) => {
+    const sortedCols = (p.columns || []).sort((a, b) => a.order - b.order);
+    const lastColId = sortedCols[sortedCols.length - 1]?.id;
     const total = p.tasks.length;
-    const done = p.tasks.filter((t) => t.status === "COMPLETED").length;
+    const done = p.tasks.filter((t) =>
+      t.status === "COMPLETED" || (lastColId && t.columnId === lastColId)
+    ).length;
     return {
       ...p,
       progress: total > 0 ? Math.round((done / total) * 100) : 0,

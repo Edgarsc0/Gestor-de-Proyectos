@@ -532,8 +532,18 @@ export default function ProjectDetailPage() {
     });
   };
 
+  // Calcula el status según la posición de la columna para mantener sincronía con el dashboard
+  const getStatusForColumn = (colId) => {
+    const cols = (project?.columns || []).sort((a, b) => a.order - b.order);
+    const idx = cols.findIndex((c) => c.id === colId);
+    if (idx <= 0) return "PENDING";
+    if (idx === cols.length - 1) return "COMPLETED";
+    if (cols.length >= 4 && idx === cols.length - 2) return "IN_REVIEW";
+    return "IN_PROGRESS";
+  };
+
   const moveTask = (taskId, newColumnId) =>
-    updateTask(taskId, { columnId: newColumnId });
+    updateTask(taskId, { columnId: newColumnId, status: getStatusForColumn(newColumnId) });
 
   const createColumn = async () => {
     if (!newColumnName.trim()) {
@@ -2482,8 +2492,9 @@ export default function ProjectDetailPage() {
                       key={c.id}
                       type="button"
                       onClick={() => {
-                        updateTask(editTask.id, { columnId: c.id });
-                        setEditTask({ ...editTask, columnId: c.id });
+                        const newStatus = getStatusForColumn(c.id);
+                        updateTask(editTask.id, { columnId: c.id, status: newStatus });
+                        setEditTask({ ...editTask, columnId: c.id, status: newStatus });
                       }}
                       className={`px-3 py-1.5 rounded-lg text-xs font-medium border flex items-center gap-1.5 transition-colors
                         ${isSelected ? "bg-slate-100 dark:bg-slate-800 border-slate-300 dark:border-slate-600 shadow-sm" : "bg-slate-50 border-slate-200 dark:bg-slate-800/30 dark:border-slate-700 hover:border-slate-300 dark:hover:border-slate-600"}`}

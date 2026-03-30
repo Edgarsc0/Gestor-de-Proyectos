@@ -195,6 +195,7 @@ export default function ProyectosPage() {
   const { data: session } = useSession();
   const [projects, setProjects] = useState([]);
   const [areas, setAreas] = useState([]);
+  const [memberAreas, setMemberAreas] = useState([]); // áreas del MEMBER actual
   const [loading, setLoading] = useState(true);
   const [viewMode, setViewMode] = useState("areas"); // "areas" | "all"
   const [areaFilter, setAreaFilter] = useState("all");
@@ -210,20 +211,33 @@ export default function ProyectosPage() {
   });
 
   const fetchData = useCallback(async () => {
+    const role = session?.user?.role;
+    const areasUrl = role === "MEMBER" ? "/api/user/areas" : "/api/admin/areas";
     const [pr, ar] = await Promise.all([
       fetch("/api/projects"),
-      fetch("/api/admin/areas").catch(() => ({ json: () => [] })),
+      fetch(areasUrl).catch(() => ({ json: () => [] })),
     ]);
     const pData = await pr.json();
     const aData = await ar.json().catch(() => []);
     setProjects(pData);
-    setAreas(Array.isArray(aData) ? aData : []);
+    if (role === "MEMBER") {
+      setMemberAreas(Array.isArray(aData) ? aData : []);
+    } else {
+      setAreas(Array.isArray(aData) ? aData : []);
+    }
     setLoading(false);
-  }, []);
+  }, [session?.user?.role]);
 
   useEffect(() => {
     fetchData();
   }, [fetchData]);
+
+  // Pre-seleccionar el área del MEMBER al abrir el modal
+  useEffect(() => {
+    if (showCreate && userRole === "MEMBER" && memberAreas.length > 0) {
+      setFormData((prev) => ({ ...prev, areaId: memberAreas[0].id }));
+    }
+  }, [showCreate, userRole, memberAreas]);
 
   const createProject = async () => {
     if (!formData.name.trim()) return;
@@ -367,7 +381,7 @@ export default function ProyectosPage() {
               ))}
             </div>
           )}
-          {(isAdminLike || userRole === "TITULAR") && (
+          {(isAdminLike || userRole === "TITULAR" || userRole === "MEMBER") && (
             <motion.button
               whileHover={{ scale: 1.02 }}
               whileTap={{ scale: 0.97 }}
@@ -741,7 +755,7 @@ export default function ProyectosPage() {
               }
             />
           </div>
-          {areas.length > 0 && (
+          {(areas.length > 0 || memberAreas.length > 0) && (
             <div>
               <label className="text-sm font-medium text-slate-700 dark:text-slate-300 mb-1.5 block">
                 Área
@@ -749,15 +763,26 @@ export default function ProyectosPage() {
               {userRole === "TITULAR" ? (
                 <div className="input-field flex items-center gap-2 cursor-not-allowed opacity-70">
                   {myArea?.color && (
-                    <span
-                      className="w-2.5 h-2.5 rounded-full flex-shrink-0"
-                      style={{ background: myArea.color }}
-                    />
+                    <span className="w-2.5 h-2.5 rounded-full flex-shrink-0" style={{ background: myArea.color }} />
                   )}
-                  <span className="text-sm text-slate-700 dark:text-slate-300">
-                    {myArea?.name || "Sin área"}
-                  </span>
+                  <span className="text-sm text-slate-700 dark:text-slate-300">{myArea?.name || "Sin área"}</span>
                 </div>
+              ) : userRole === "MEMBER" ? (
+                memberAreas.length === 1 ? (
+                  <div className="input-field flex items-center gap-2 cursor-not-allowed opacity-70">
+                    {memberAreas[0]?.color && (
+                      <span className="w-2.5 h-2.5 rounded-full flex-shrink-0" style={{ background: memberAreas[0].color }} />
+                    )}
+                    <span className="text-sm text-slate-700 dark:text-slate-300">{memberAreas[0]?.name || "Sin área"}</span>
+                  </div>
+                ) : (
+                  <Select
+                    value={formData.areaId}
+                    onChange={(v) => setFormData({ ...formData, areaId: v })}
+                    placeholder="Seleccionar área"
+                    options={memberAreas.map((a) => ({ value: a.id, label: a.name, color: a.color }))}
+                  />
+                )
               ) : (
                 <Select
                   value={formData.areaId}
@@ -765,11 +790,7 @@ export default function ProyectosPage() {
                   placeholder="Sin área"
                   options={[
                     { value: "", label: "Sin área" },
-                    ...areas.map((a) => ({
-                      value: a.id,
-                      label: a.name,
-                      color: a.color,
-                    })),
+                    ...areas.map((a) => ({ value: a.id, label: a.name, color: a.color })),
                   ]}
                 />
               )}
